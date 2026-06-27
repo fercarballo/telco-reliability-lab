@@ -1,0 +1,36 @@
+global:
+  resolve_timeout: 5m
+
+# In a production deployment this would route to PagerDuty/OpsGenie/Slack.
+# In this lab every alert fires the API's own webhook endpoint, which logs
+# the payload via pino → Loki — keeping everything self-contained and
+# visible in the Grafana "Explore" view without external dependencies.
+
+route:
+  group_by: ['alertname', 'journey', 'severity']
+  group_wait: 30s       # wait before sending the first alert in a group
+  group_interval: 5m    # wait before sending a changed alert in the same group
+  repeat_interval: 1h   # resend unresolved alerts every hour
+  receiver: api-webhook
+
+  # Severity routing: page-level alerts repeat more frequently.
+  routes:
+    - match:
+        severity: page
+      receiver: api-webhook
+      repeat_interval: 15m
+
+receivers:
+  - name: api-webhook
+    webhook_configs:
+      - url: http://api:3000/admin/alerts
+        send_resolved: true
+
+inhibit_rules:
+  # If the API is completely down, suppress all journey-level SLO alerts
+  # (they're symptoms of the root cause, not independent incidents).
+  - source_match:
+      alertname: TelcoAPIDown
+    target_match_re:
+      alertname: (Payment|Login|InvoiceLookup|PlanChange).*
+    equal: ['service']

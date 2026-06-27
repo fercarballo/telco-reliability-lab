@@ -1,0 +1,7 @@
+rules:
+  # localhost is expected for a local-dev portfolio spec
+  no-server-example.com: off
+  # health/live/metrics are intentionally 4xx-free internal endpoints
+  operation-4xx-response: warn
+  # MIT identifier would require SPDX format; name-only is fine for a lab
+  info-license-strict: off

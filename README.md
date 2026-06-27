@@ -23,7 +23,9 @@ injection, and CI quality gates that can block a release on reliability.
 - **Fault injection** — inject latency / errors / timeouts at runtime to drive
   the degradation demo (env-gated; lab only).
 - **Functional tests** — Playwright API integration tests covering auth guards, schema validation, invoice access control, and the **payment idempotency invariant** (same `Idempotency-Key` must never produce a second charge).
-- **CI/CD** — GitHub Actions and GitLab CI: unit tests + typecheck + Playwright API tests + k6 smoke as quality gates; scheduled stress/spike/soak with run-to-run regression comparison and OWASP ZAP passive scan.
+- **Alerting** — Prometheus alert rules for each SLO (per-journey p95 + error rate + API down); Alertmanager routes webhook → `POST /admin/alerts` on the API itself, so firing alerts appear in Loki alongside traces — no external dependencies needed.
+- **OpenAPI 3.1 spec** — `docs/openapi.yaml` documents every endpoint with request/response schemas; linted with Redocly in CI as a quality gate.
+- **CI/CD** — GitHub Actions and GitLab CI: typecheck + unit tests + OpenAPI lint + Playwright API tests + k6 smoke as quality gates; scheduled stress/spike/soak with run-to-run regression comparison and OWASP ZAP passive scan.
 
 ## Architecture
 
@@ -102,6 +104,9 @@ payment p95 breaching budget → open a slow trace in Tempo → the time is in
 | GET | `/health` · `/health/live` | Readiness (deps) · liveness |
 | GET | `/metrics` | Prometheus exposition |
 | POST/GET/DELETE | `/admin/faults` | Fault injection (env-gated) |
+| POST | `/admin/alerts` | Alertmanager webhook receiver — logs firing alerts to Loki |
+
+Full contract: [`docs/openapi.yaml`](docs/openapi.yaml) (OAS 3.1, validated with Redocly).
 
 ## SLOs (gated by k6 thresholds)
 
@@ -154,12 +159,17 @@ apps/web/              Demo self-management UI (static SPA, nginx reverse-proxie
 tests/api/             Playwright API integration tests (no browser — pure HTTP)
 tests/k6/              Performance suite: scenarios, profiles, thresholds, helpers
 tests/zap/             OWASP ZAP passive scan reports (generated; gitignored)
-observability/         OTel Collector, Tempo, Loki, Prometheus, Grafana (4 dashboards as code)
+observability/
+  prometheus/          prometheus.yml + alert-rules.yml (SLO breach rules)
+  alertmanager/        alertmanager.yml (webhook → API /admin/alerts)
+  grafana/             4 dashboards as code (RED, k6 run, SLO overview, reliability)
+  otel-collector/      OTel Collector config
+  tempo/ loki/         Trace + log backends
 infra/postgres/        Schema + deterministic synthetic seed
-scripts/               verify-stack.sh, compare-runs.js, zap-smoke.sh
-docs/                  Architecture, SLOs, strategy, reliability, observability, runbook, interview
-.github/ · .gitlab-ci  CI pipelines: unit + Playwright + smoke gates; scheduled diagnostic + ZAP
-docker-compose.yml     One-command reproducible environment
+scripts/               verify-stack.sh, compare-runs.js, zap-smoke.sh, generate-report.js
+docs/                  openapi.yaml (OAS 3.1), architecture, SLOs, strategy, runbook, interview
+.github/ · .gitlab-ci  CI: build + spec-lint + Playwright + k6 smoke gates; scheduled diagnostic + ZAP
+docker-compose.yml     One-command reproducible environment (includes Alertmanager)
 playwright.config.ts   Playwright config (API tests, no browser)
 ```
 
@@ -174,8 +184,8 @@ playwright.config.ts   Playwright config (API tests, no browser)
 
 ## Roadmap
 
-k6 on Kubernetes (k6-operator), Alertmanager, OpenAPI contract validation,
-Alertmanager webhook + PagerDuty routing, ArgoCD/GitOps.
+k6 on Kubernetes (k6-operator), ArgoCD/GitOps, Alertmanager → PagerDuty/Slack
+webhook in a real staging environment.
 
 ## Disclaimer
 

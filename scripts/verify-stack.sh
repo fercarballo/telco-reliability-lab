@@ -12,6 +12,7 @@ set -uo pipefail
 
 API=${API:-http://localhost:3000}
 PROM=${PROM:-http://localhost:9090}
+ALERTMANAGER=${ALERTMANAGER:-http://localhost:9093}
 TEMPO=${TEMPO:-http://localhost:3200}
 LOKI=${LOKI:-http://localhost:3100}
 GRAFANA=${GRAFANA:-http://localhost:3001}
@@ -61,11 +62,13 @@ echo "==> Component health"
 # API readiness: database + redis must report ok.
 check "API /health database+redis ok" bash -c "curl -fsS $API/health | grep -q '\"database\":\"ok\"' && curl -fsS $API/health | grep -q '\"redis\":\"ok\"'"
 check "API /metrics exposes RED series" bash -c "curl -fsS $API/metrics | grep -q '^http_requests_total'"
-check "Prometheus ready"  curl -fsS "$PROM/-/ready"
-check "Tempo ready"       curl -fsS "$TEMPO/ready"
-check "Loki ready"        curl -fsS "$LOKI/ready"
-check "Grafana health"    curl -fsS "$GRAFANA/api/health"
-check "Web UI serves"     curl -fsS "$WEB/"
+check "Prometheus ready"     curl -fsS "$PROM/-/ready"
+check "Alertmanager ready"   curl -fsS "$ALERTMANAGER/-/ready"
+check "Prometheus alert rules loaded" bash -c "curl -fsS '$PROM/api/v1/rules' | grep -q 'PaymentP95SLOBreach'"
+check "Tempo ready"          curl -fsS "$TEMPO/ready"
+check "Loki ready"           curl -fsS "$LOKI/ready"
+check "Grafana health"       curl -fsS "$GRAFANA/api/health"
+check "Web UI serves"        curl -fsS "$WEB/"
 
 echo "==> Generate a little traffic, then verify the pipeline"
 # Drive one full journey so Prometheus has something to scrape and Loki has logs.

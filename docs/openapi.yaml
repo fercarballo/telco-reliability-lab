@@ -1,0 +1,695 @@
+openapi: "3.1.0"
+
+info:
+  title: Telco Reliability Lab API
+  version: "1.0.0"
+  description: |
+    Realistic telco self-management API used as the system under test for a
+    performance & reliability engineering portfolio.
+
+    Four business journeys are exposed — login, invoice lookup, plan change, and
+    payment — each instrumented with Prometheus RED metrics, OpenTelemetry traces,
+    and structured logs carrying `trace_id` for Grafana correlation.
+
+    **Payment idempotency** is enforced at the database layer: a `UNIQUE` constraint
+    on `idempotency_key` guarantees that repeated requests with the same key return
+    the original result without creating a second charge.
+  contact:
+    name: Fernando Carballo
+    email: fercarballodev@gmail.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local Docker Compose stack
+
+# Default: no authentication required. Protected endpoints override this
+# explicitly with security: [{BearerAuth: []}].
+security: []
+
+tags:
+  - name: auth
+    description: Authentication — JWT issuance
+  - name: invoices
+    description: Invoice management — read-only for customers
+  - name: plan-changes
+    description: Plan change scheduling
+  - name: payments
+    description: Payment processing with DB-enforced idempotency
+  - name: system
+    description: Health checks and Prometheus metrics
+  - name: admin
+    description: >
+      Lab-only endpoints for fault injection and test data management.
+      Protected by `FAULT_INJECTION_ENABLED` environment variable.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT issued by `POST /auth/login`. Include as
+        `Authorization: Bearer <token>` on all protected endpoints.
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: invalid_credentials
+        message:
+          type: string
+          description: Human-readable explanation
+          example: Invalid username or password
+
+    Invoice:
+      type: object
+      required: [invoiceId, amount, status, dueDate]
+      properties:
+        invoiceId:
+          type: string
+          example: inv_customer_001_1
+        amount:
+          type: number
+          format: double
+          example: 49.99
+        status:
+          type: string
+          enum: [pending, paid, overdue]
+          example: pending
+        dueDate:
+          type: string
+          format: date
+          example: "2026-07-15"
+
+    PaymentResult:
+      type: object
+      required: [paymentId, status, invoiceStatus]
+      properties:
+        paymentId:
+          type: string
+          example: pay_a1b2c3d4
+        status:
+          type: string
+          enum: [approved, declined]
+          example: approved
+        invoiceStatus:
+          type: string
+          enum: [paid, pending, overdue, unknown]
+          example: paid
+
+    PlanChangeResult:
+      type: object
+      required: [changeId, status, effectiveDate]
+      properties:
+        changeId:
+          type: string
+          example: chg_e5f6g7h8
+        status:
+          type: string
+          enum: [scheduled]
+          example: scheduled
+        effectiveDate:
+          type: string
+          format: date
+          description: Four days from the request date (next billing cycle)
+          example: "2026-07-01"
+
+    HealthResponse:
+      type: object
+      required: [status, database, redis, observability]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        database:
+          type: string
+          enum: [ok, down]
+        redis:
+          type: string
+          enum: [ok, down]
+        observability:
+          type: string
+          enum: [ok]
+
+    FaultSpec:
+      type: object
+      required: [target, fault]
+      properties:
+        target:
+          type: string
+          enum: [auth, billing, plans, payments, global]
+          description: Which journey to inject the fault into (`global` affects all)
+        fault:
+          type: string
+          enum: [latency, error, timeout]
+        rate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          default: 1.0
+          description: Fraction of requests that trigger the fault (1.0 = 100%)
+        latencyMs:
+          type: integer
+          minimum: 0
+          maximum: 60000
+          default: 0
+          description: Extra latency injected in milliseconds (for `latency` fault type)
+        durationSec:
+          type: integer
+          minimum: 1
+          maximum: 3600
+          default: 300
+          description: How long the fault remains active, in seconds
+
+paths:
+  # --------------------------------------------------------------------------
+  # Auth
+  # --------------------------------------------------------------------------
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Authenticate and receive a JWT
+      description: |
+        Issues a short-lived JWT on successful credential verification. The token
+        carries `sub` (customerId) and `username` claims and must be included in
+        the `Authorization: Bearer` header for all protected endpoints.
+
+        A Redis entry is created for the session to demonstrate span correlation
+        in the distributed trace.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              additionalProperties: false
+              properties:
+                username:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  example: user_001
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  example: password123
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, customerId, expiresIn]
+                properties:
+                  accessToken:
+                    type: string
+                    description: "Signed JWT — include as Authorization: Bearer <token>"
+                  customerId:
+                    type: string
+                    example: customer_001
+                  expiresIn:
+                    type: integer
+                    description: Token lifetime in seconds
+                    example: 3600
+        "400":
+          description: Missing or invalid request fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid credentials (same response for wrong username or wrong password — no enumeration)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: invalid_credentials
+                message: Invalid username or password
+
+  # --------------------------------------------------------------------------
+  # Invoices
+  # --------------------------------------------------------------------------
+  /customers/{customerId}/invoices:
+    get:
+      tags: [invoices]
+      operationId: listInvoices
+      summary: List invoices for a customer
+      description: |
+        Returns all invoices for the authenticated customer, ordered by due date
+        descending. A customer may only read their own invoices — cross-customer
+        access returns `403`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+          example: customer_001
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [customerId, invoices]
+                properties:
+                  customerId:
+                    type: string
+                    example: customer_001
+                  invoices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Invoice"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Token belongs to a different customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: forbidden
+                message: Cannot access another customer
+
+  # --------------------------------------------------------------------------
+  # Plan changes
+  # --------------------------------------------------------------------------
+  /customers/{customerId}/plan-changes:
+    post:
+      tags: [plan-changes]
+      operationId: schedulePlanChange
+      summary: Schedule a plan change for a customer
+      description: |
+        Schedules a plan upgrade or downgrade effective in ~4 days (next billing
+        cycle). The target plan must exist in the catalog and be different from the
+        customer's current plan — otherwise `422` is returned.
+
+        A customer may only change their own plan.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+          example: customer_001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetPlanId]
+              additionalProperties: false
+              properties:
+                targetPlanId:
+                  type: string
+                  enum: [mobile_basic, mobile_premium, fiber_300mb, fiber_600mb, fiber_1000mb]
+                  example: fiber_300mb
+      responses:
+        "202":
+          description: Plan change accepted and scheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanChangeResult"
+        "400":
+          description: Missing or invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Token belongs to a different customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Target plan is ineligible (same as current, or does not exist)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: ineligible
+                message: Target plan invalid or equal to current plan
+
+  # --------------------------------------------------------------------------
+  # Payments
+  # --------------------------------------------------------------------------
+  /payments:
+    post:
+      tags: [payments]
+      operationId: processPayment
+      summary: Process a payment for an invoice
+      description: |
+        Processes a payment for an invoice belonging to the authenticated customer.
+
+        **Idempotency** is enforced at two levels:
+        1. A Redis cache returns the original result instantly for repeated keys.
+        2. A `UNIQUE(idempotency_key)` constraint in PostgreSQL guarantees
+           at-most-once execution under concurrency — the database, not the
+           application, arbitrates races.
+
+        A client that retried due to a network timeout receives `200` (replay) with
+        the original `paymentId` — never a second charge.
+
+        The external gateway is simulated (`payment-gateway-simulator` span) with
+        a ~1% synthetic decline rate and configurable latency. The fault injection
+        system targets this span to demonstrate p95 SLO breach scenarios.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: |
+            Client-generated unique key (UUID recommended). The same key on
+            a repeated request returns the original result without a second charge.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, invoiceId, amount, method]
+              additionalProperties: false
+              properties:
+                customerId:
+                  type: string
+                  example: customer_001
+                invoiceId:
+                  type: string
+                  example: inv_customer_001_1
+                amount:
+                  type: number
+                  format: double
+                  exclusiveMinimum: 0
+                  example: 49.99
+                method:
+                  type: string
+                  enum: [credit_card, debit_card, bank_transfer]
+                  example: credit_card
+      responses:
+        "200":
+          description: Idempotent replay — returned when the `Idempotency-Key` was already processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResult"
+        "201":
+          description: Payment approved and invoice settled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResult"
+        "400":
+          description: Missing `Idempotency-Key` header or invalid body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: missing_idempotency_key
+                message: Idempotency-Key header is required
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "402":
+          description: Payment declined by the simulated gateway
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResult"
+        "403":
+          description: Token belongs to a different customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # --------------------------------------------------------------------------
+  # System
+  # --------------------------------------------------------------------------
+  /health:
+    get:
+      tags: [system]
+      operationId: healthCheck
+      summary: Dependency health (readiness probe)
+      description: Returns `200` only when PostgreSQL and Redis are reachable.
+      responses:
+        "200":
+          description: All dependencies healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: One or more dependencies unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /health/live:
+    get:
+      tags: [system]
+      operationId: livenessCheck
+      summary: Liveness probe
+      description: Returns `200` if the process is up, regardless of dependency state.
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+
+  /metrics:
+    get:
+      tags: [system]
+      operationId: prometheusMetrics
+      summary: Prometheus metrics
+      description: |
+        Exposes RED metrics (rate, errors, duration) and business counters in
+        Prometheus text format. Scraped every 5 s by the Prometheus instance
+        provisioned in the Docker Compose stack.
+      responses:
+        "200":
+          description: Prometheus text exposition
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # --------------------------------------------------------------------------
+  # Admin (lab only — FAULT_INJECTION_ENABLED=true required)
+  # --------------------------------------------------------------------------
+  /admin/faults:
+    post:
+      tags: [admin]
+      operationId: injectFault
+      summary: Inject a fault into a journey
+      description: |
+        Injects a latency, error, or timeout fault into the specified journey
+        target at the given rate for the given duration.
+
+        Only available when `FAULT_INJECTION_ENABLED=true` (local/CI — never
+        production). Returns `403` when the env var is not set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaultSpec"
+            example:
+              target: payments
+              fault: latency
+              rate: 1.0
+              latencyMs: 3000
+              durationSec: 300
+      responses:
+        "201":
+          description: Fault injected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  injected:
+                    $ref: "#/components/schemas/FaultSpec"
+        "400":
+          description: Unknown target or fault type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Fault injection is disabled in this environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    get:
+      tags: [admin]
+      operationId: listFaults
+      summary: List active fault injections
+      responses:
+        "200":
+          description: Active faults
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  faults:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FaultSpec"
+        "403":
+          description: Fault injection is disabled in this environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [admin]
+      operationId: clearFaults
+      summary: Clear all active fault injections
+      responses:
+        "200":
+          description: All faults cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleared:
+                    type: boolean
+                    example: true
+        "403":
+          description: Fault injection is disabled in this environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/reset-invoices:
+    post:
+      tags: [admin]
+      operationId: resetInvoices
+      summary: Reset all invoices to pending
+      description: |
+        Sets `status = 'pending'` on all invoices. Used by k6 `setup()` and
+        Playwright `beforeAll` to ensure each test run starts with payable
+        invoices — preventing the payment journey from being silently skipped
+        when invoices have all been drained to `paid`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Invoices reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reset:
+                    type: boolean
+                    example: true
+                  invoicesUpdated:
+                    type: integer
+                    example: 101
+        "403":
+          description: Fault injection is disabled in this environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/alerts:
+    post:
+      tags: [admin]
+      operationId: receiveAlert
+      summary: Alertmanager webhook receiver
+      description: |
+        Receives Alertmanager webhook payloads and logs them via pino → Loki so
+        alert firings appear in the Grafana Explore view alongside traces and
+        metrics — keeping the full alert chain visible without any external
+        dependency (no Slack/PagerDuty needed for the lab).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Standard Alertmanager webhook payload
+      responses:
+        "200":
+          description: Alert payload received and logged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: integer
+                    description: Number of alerts in the payload
+                    example: 2
+        "403":
+          description: Fault injection is disabled in this environment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

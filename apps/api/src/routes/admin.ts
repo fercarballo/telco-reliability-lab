@@ -67,4 +67,25 @@ export default async function adminRoutes(app: FastifyInstance) {
     request.log.warn({ rowCount: result.rowCount }, 'invoices reset to pending');
     return reply.code(200).send({ reset: true, invoicesUpdated: result.rowCount });
   });
+
+  // Alertmanager webhook receiver.
+  // In production this would be a PagerDuty/Slack integration; in the lab it
+  // logs alert payloads via pino → Loki so they appear in the Grafana Explore
+  // view alongside traces and metrics — keeping the full alert chain visible
+  // without any external dependency.
+  app.post('/admin/alerts', async (request, reply) => {
+    const payload = request.body as Record<string, unknown>;
+    const alerts = (payload?.alerts as Array<Record<string, unknown>>) ?? [];
+    for (const alert of alerts) {
+      const status = alert.status as string;
+      const name   = (alert.labels as Record<string, string>)?.alertname ?? 'unknown';
+      const sev    = (alert.labels as Record<string, string>)?.severity  ?? 'unknown';
+      if (status === 'firing') {
+        request.log.error({ alert }, `[ALERT FIRING] ${name} (${sev})`);
+      } else {
+        request.log.info({ alert }, `[ALERT RESOLVED] ${name}`);
+      }
+    }
+    return reply.code(200).send({ received: alerts.length });
+  });
 }

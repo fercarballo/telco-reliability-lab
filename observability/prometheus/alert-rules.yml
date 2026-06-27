@@ -1,0 +1,118 @@
+groups:
+  - name: slo.latency
+    rules:
+      # Payment p95 > 1500 ms — highest-risk journey; money is involved.
+      - alert: PaymentP95SLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{route="/payments"}[5m])) by (le)
+          ) > 1.5
+        for: 1m
+        labels:
+          severity: page
+          journey: payment
+          slo: latency
+        annotations:
+          summary: "Payment p95 latency SLO breach"
+          description: >
+            Payment p95 is {{ $value | humanizeDuration }} — exceeds the 1500 ms SLO.
+            Check the payment-gateway-simulator span in Tempo for the hot path.
+          runbook: "https://github.com/you/telco-reliability-lab/blob/main/docs/runbook.md"
+
+      # Login p95 > 600 ms — gate to everything; tail latency frustrates users.
+      - alert: LoginP95SLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{route="/auth/login"}[5m])) by (le)
+          ) > 0.6
+        for: 1m
+        labels:
+          severity: warn
+          journey: login
+          slo: latency
+        annotations:
+          summary: "Login p95 latency SLO breach"
+          description: >
+            Login p95 is {{ $value | humanizeDuration }} — exceeds the 600 ms SLO.
+
+      # Invoice lookup p95 > 800 ms — read-heavy, DB-bound.
+      - alert: InvoiceLookupP95SLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{route="/customers/:customerId/invoices"}[5m])) by (le)
+          ) > 0.8
+        for: 1m
+        labels:
+          severity: warn
+          journey: invoice_lookup
+          slo: latency
+        annotations:
+          summary: "Invoice lookup p95 latency SLO breach"
+          description: >
+            Invoice lookup p95 is {{ $value | humanizeDuration }} — exceeds the 800 ms SLO.
+
+      # Plan change p95 > 1200 ms — catalog eligibility check + DB write.
+      - alert: PlanChangeP95SLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{route="/customers/:customerId/plan-changes"}[5m])) by (le)
+          ) > 1.2
+        for: 1m
+        labels:
+          severity: warn
+          journey: plan_change
+          slo: latency
+        annotations:
+          summary: "Plan change p95 latency SLO breach"
+          description: >
+            Plan change p95 is {{ $value | humanizeDuration }} — exceeds the 1200 ms SLO.
+
+  - name: slo.availability
+    rules:
+      # 5xx error rate > 1% across all routes.
+      - alert: APIErrorRateHigh
+        expr: |
+          sum(rate(http_request_errors_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) > 0.01
+        for: 1m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "API 5xx error rate above 1% SLO"
+          description: >
+            5xx error rate is {{ $value | humanizePercentage }}.
+            Check container logs and active fault injections.
+
+      # Payment-specific error rate (includes 402 Declined — intentional for gateway
+      # simulation; alert only on 5xx to avoid false positives from declined cards).
+      - alert: PaymentServerErrorRateHigh
+        expr: |
+          sum(rate(http_request_errors_total{route="/payments", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{route="/payments"}[5m])) > 0.01
+        for: 1m
+        labels:
+          severity: page
+          journey: payment
+          slo: availability
+        annotations:
+          summary: "Payment server error rate above 1% SLO"
+          description: >
+            Payment 5xx rate is {{ $value | humanizePercentage }}.
+            This may indicate gateway saturation or injected fault.
+
+  - name: infrastructure
+    rules:
+      # Telco API scrape target is down — critical signal before SLO metrics appear.
+      - alert: TelcoAPIDown
+        expr: up{job="telco-api"} == 0
+        for: 30s
+        labels:
+          severity: page
+        annotations:
+          summary: "Telco API is unreachable (Prometheus scrape failing)"
+          description: >
+            Prometheus cannot scrape {{ $labels.instance }}.
+            The API process may have crashed or the container is not healthy.

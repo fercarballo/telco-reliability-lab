@@ -67,6 +67,20 @@ services:
     ports:
       - "3100:3100"
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--log.level=info"
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "9093:9093"
+    depends_on:
+      - api
+
   prometheus:
     image: prom/prometheus:latest
     command:
@@ -77,10 +91,12 @@ services:
       - "--web.enable-remote-write-receiver"
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
+      - alertmanager
       - api
 
   grafana:
@@ -189,4 +205,5 @@ volumes:
   tempo-data:
   loki-data:
   prometheus-data:
+  alertmanager-data:
   grafana-data:

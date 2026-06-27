@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
 
-.PHONY: help up down logs ps seed build test api-test smoke load stress spike soak degradation smoke-breach compare-runs zap-smoke fault-clear
+.PHONY: help up down logs ps seed build test api-test lint-spec smoke load stress spike soak degradation smoke-breach compare-runs zap-smoke fault-clear
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -39,6 +39,14 @@ api-test: ## Run Playwright API integration tests (stack must be running: make u
 
 api-test-report: ## Open the last Playwright API test HTML report
 	npx playwright show-report tests/api/reports
+
+lint-spec: ## Lint the OpenAPI 3.1 spec with Redocly (0 errors = valid contract)
+	npx @redocly/cli lint docs/openapi.yaml
+
+report: ## Generate executive Markdown report from last smoke run (PROFILE=smoke)
+	node scripts/generate-report.js \
+		$(or $(SUMMARY),tests/k6/reports/$(or $(PROFILE),smoke)-summary.json) \
+		--profile $(or $(PROFILE),smoke)
 
 # RW = stream live metrics to Prometheus so the "k6 Test Run" dashboard fills in.
 # HTML = export a static web-dashboard report; open tests/k6/reports/<profile>-report.html after the run.
