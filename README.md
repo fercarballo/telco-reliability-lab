@@ -175,11 +175,14 @@ playwright.config.ts   Playwright config (API tests, no browser)
 
 ## Documentation
 
+- [Executive overview](docs/executive-overview.md) ← start here for non-technical audiences
 - [Architecture & decisions](docs/architecture.md)
 - [SLOs, SLIs & thresholds](docs/slo-definition.md)
 - [Performance testing strategy](docs/performance-strategy.md)
 - [Reliability testing (idempotency & faults)](docs/reliability-testing.md)
 - [Observability guide (metric → trace → log)](docs/observability-guide.md)
+- [Database schema](docs/database-schema.md)
+- [API error catalog](docs/error-codes.md)
 - [Interview walkthrough](docs/interview-walkthrough.md)
 
 ## Roadmap
