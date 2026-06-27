@@ -14,9 +14,12 @@ dist/
 *.log
 npm-debug.log*
 
-# k6 reports (keep the directory, ignore the artifacts)
+# k6 reports — HTML + JSON summaries are portfolio evidence; commit them.
+# Binary/large artifacts (raw JSON logs, etc.) stay ignored.
 tests/k6/reports/*
 !tests/k6/reports/.gitkeep
+!tests/k6/reports/*.html
+!tests/k6/reports/*.json
 
 # OS / editor
 .DS_Store

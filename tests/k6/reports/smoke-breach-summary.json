@@ -1,0 +1,337 @@
+{
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "login: status 200": {
+                    "fails": 0,
+                    "name": "login: status 200",
+                    "path": "::login: status 200",
+                    "id": "4d9cb0041884c26a6b714904c7aba027",
+                    "passes": 49
+                },
+                "login: token present": {
+                    "passes": 49,
+                    "fails": 0,
+                    "name": "login: token present",
+                    "path": "::login: token present",
+                    "id": "b437ced4f6fb42891400848739db36d2"
+                },
+                "login: customerId present": {
+                    "name": "login: customerId present",
+                    "path": "::login: customerId present",
+                    "id": "108ba5d041ae6521b5550cf8584744bb",
+                    "passes": 49,
+                    "fails": 0
+                },
+                "invoices: status 200": {
+                    "name": "invoices: status 200",
+                    "path": "::invoices: status 200",
+                    "id": "155d76aee05bab6c859889122dfe5f88",
+                    "passes": 49,
+                    "fails": 0
+                },
+                "invoices: list present": {
+                    "name": "invoices: list present",
+                    "path": "::invoices: list present",
+                    "id": "b2c6bfbbc3f8aa751fae7fb77f6058ac",
+                    "passes": 49,
+                    "fails": 0
+                },
+                "plan change: status 202": {
+                    "path": "::plan change: status 202",
+                    "id": "adce7f09ea70a56e7515e1368299c4ce",
+                    "passes": 49,
+                    "fails": 0,
+                    "name": "plan change: status 202"
+                },
+                "plan change: changeId present": {
+                    "name": "plan change: changeId present",
+                    "path": "::plan change: changeId present",
+                    "id": "e38ecf78f076eff59de031a594d0dad1",
+                    "passes": 49,
+                    "fails": 0
+                },
+                "plan change: scheduled": {
+                    "name": "plan change: scheduled",
+                    "path": "::plan change: scheduled",
+                    "id": "b2722abf46acb6415482f7b52eb86f53",
+                    "passes": 49,
+                    "fails": 0
+                },
+                "payment: status 200/201": {
+                    "passes": 41,
+                    "fails": 2,
+                    "name": "payment: status 200/201",
+                    "path": "::payment: status 200/201",
+                    "id": "b4701b9a2fad53801e1dfd2ffb9d010b"
+                },
+                "payment: paymentId present": {
+                    "name": "payment: paymentId present",
+                    "path": "::payment: paymentId present",
+                    "id": "333c8dbad3368a04208f36fe0243a400",
+                    "passes": 43,
+                    "fails": 0
+                },
+                "payment: approved": {
+                    "name": "payment: approved",
+                    "path": "::payment: approved",
+                    "id": "a4b1e1f9aa5db4de1922d9990b8e933b",
+                    "passes": 41,
+                    "fails": 2
+                },
+                "payment replay: status 200": {
+                    "name": "payment replay: status 200",
+                    "path": "::payment replay: status 200",
+                    "id": "b2b4d971930239755a1a3fce1489094a",
+                    "passes": 41,
+                    "fails": 0
+                },
+                "payment replay: same paymentId": {
+                    "passes": 41,
+                    "fails": 0,
+                    "name": "payment replay: same paymentId",
+                    "path": "::payment replay: same paymentId",
+                    "id": "9c27a087e25051f54d92700cc44cb212"
+                }
+            },
+        "name": ""
+    },
+    "metrics": {
+        "http_req_sending": {
+            "max": 0.177835,
+            "avg": 0.027121879310344835,
+            "min": 0.002542,
+            "med": 0.0216045,
+            "p(90)": 0.0536337,
+            "p(95)": 0.05774635,
+            "p(99)": 0.09961853999999991
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0,
+            "max": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_failed": {
+            "passes": 2,
+            "fails": 230,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0.008620689655172414
+        },
+        "http_req_connecting": {
+            "max": 0.11075,
+            "avg": 0.001565012931034483,
+            "min": 0,
+            "med": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0.08064601999999998
+        },
+        "invoice_lookup_duration": {
+            "med": 1.433885,
+            "p(90)": 2.3819416,
+            "p(95)": 2.5294004,
+            "p(99)": 2.679,
+            "max": 2.730792,
+            "avg": 1.4834931632653061,
+            "min": 0.628088
+        },
+        "iterations": {
+            "count": 49,
+            "rate": 0.7751168853705656
+        },
+        "iteration_duration": {
+            "p(90)": 4484.0174098,
+            "p(95)": 4601.1930818,
+            "p(99)": 5876.213993319999,
+            "max": 6995.847445,
+            "avg": 3803.678166714287,
+            "min": 518.427275,
+            "med": 4128.732435
+        },
+        "checks": {
+            "passes": 599,
+            "fails": 4,
+            "thresholds": {
+                "rate>0.99": false
+            },
+            "value": 0.9933665008291874
+        },
+        "http_req_duration{journey:invoice_lookup}": {
+            "avg": 1.4834931632653061,
+            "min": 0.628088,
+            "med": 1.433885,
+            "p(90)": 2.3819416,
+            "p(95)": 2.5294004,
+            "p(99)": 2.679,
+            "max": 2.730792,
+            "thresholds": {
+                "p(95)<800": false
+            }
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 0.628088,
+            "med": 2.4648085,
+            "p(90)": 3152.6581557000004,
+            "p(95)": 3174.9251444499996,
+            "p(99)": 3202.27836208,
+            "max": 5971.95633,
+            "avg": 577.6333024869568
+        },
+        "data_received": {
+            "count": 72585,
+            "rate": 1148.201206624949
+        },
+        "http_req_duration{journey:payment}": {
+            "min": 0.822423,
+            "med": 3129.725088,
+            "p(90)": 3181.8831075000003,
+            "p(95)": 3201.4229232999996,
+            "p(99)": 3680.384674019998,
+            "max": 5971.95633,
+            "avg": 1652.5007053452389,
+            "thresholds": {
+                "p(95)<1500": true
+            }
+        },
+        "http_req_receiving": {
+            "p(90)": 0.1646636,
+            "p(95)": 0.19959679999999985,
+            "p(99)": 0.30696172999999993,
+            "max": 0.668172,
+            "avg": 0.08681975,
+            "min": 0.008333,
+            "med": 0.065042
+        },
+        "http_req_duration": {
+            "max": 5971.95633,
+            "avg": 599.9953089181038,
+            "min": 0.628088,
+            "med": 2.4895175,
+            "p(90)": 3155.4109623,
+            "p(95)": 3176.12704645,
+            "p(99)": 3202.27387312,
+            "thresholds": {
+                "p(95)<1200": true
+            }
+        },
+        "http_req_duration{journey:plan_change}": {
+            "p(99)": 6.8015967999999996,
+            "max": 7.2598,
+            "avg": 2.8589133469387744,
+            "min": 1.125591,
+            "med": 2.67881,
+            "p(90)": 4.105841000000001,
+            "p(95)": 5.008692199999999,
+            "thresholds": {
+                "p(95)<1200": false
+            }
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 3
+        },
+        "http_req_waiting": {
+            "p(90)": 3155.2151937999997,
+            "p(95)": 3176.01218685,
+            "p(99)": 3202.09701339,
+            "max": 5971.625577,
+            "avg": 599.8813672887932,
+            "min": 0.600546,
+            "med": 2.3960795
+        },
+        "http_reqs": {
+            "rate": 3.669941171550433,
+            "count": 232
+        },
+        "http_req_duration{journey:login}": {
+            "p(99)": 9.12507352,
+            "max": 9.289834,
+            "avg": 3.5582423673469386,
+            "min": 1.138175,
+            "med": 3.371107,
+            "p(90)": 5.3468944,
+            "p(95)": 5.6325406,
+            "thresholds": {
+                "p(95)<600": false
+            }
+        },
+        "vus_max": {
+            "max": 3,
+            "value": 3,
+            "min": 3
+        },
+        "payment_duration": {
+            "avg": 3226.61543355814,
+            "min": 3129.189396,
+            "med": 3160.371835,
+            "p(90)": 3201.4075324,
+            "p(95)": 3202.3210072,
+            "p(99)": 4812.365853479999,
+            "max": 5971.95633
+        },
+        "invoice_lookup_success_rate": {
+            "fails": 0,
+            "passes": 49,
+            "value": 1
+        },
+        "login_duration": {
+            "min": 1.138175,
+            "med": 3.371107,
+            "p(90)": 5.3468944,
+            "p(95)": 5.6325406,
+            "p(99)": 9.12507352,
+            "max": 9.289834,
+            "avg": 3.5582423673469386
+        },
+        "plan_change_success_rate": {
+            "passes": 49,
+            "fails": 0,
+            "value": 1
+        },
+        "payment_success_rate": {
+            "passes": 41,
+            "fails": 2,
+            "value": 0.9534883720930233
+        },
+        "login_success_rate": {
+            "passes": 49,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_blocked": {
+            "avg": 0.015259969827586218,
+            "min": 0.000709,
+            "med": 0.004833,
+            "p(90)": 0.0134792,
+            "p(95)": 0.026969449999999964,
+            "p(99)": 0.11663549999999995,
+            "max": 1.4995
+        },
+        "data_sent": {
+            "count": 82727,
+            "rate": 1308.6345831847098
+        },
+        "payment_idempotency_conflicts": {
+            "count": 41,
+            "rate": 0.648567189799861
+        },
+        "plan_change_duration": {
+            "p(99)": 6.8015967999999996,
+            "max": 7.2598,
+            "avg": 2.8589133469387744,
+            "min": 1.125591,
+            "med": 2.67881,
+            "p(90)": 4.105841000000001,
+            "p(95)": 5.008692199999999
+        }
+    }
+}
