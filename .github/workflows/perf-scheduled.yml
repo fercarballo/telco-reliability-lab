@@ -61,6 +61,37 @@ jobs:
             --out 'web-dashboard=export=/scripts/reports/soak-report.html' \
             --summary-export /scripts/reports/soak-summary.json /scripts/scenarios/soak.js
 
+      - name: Run-to-run comparison (stress vs smoke baseline)
+        if: always()
+        continue-on-error: true
+        run: |
+          # Compare stress against the last committed smoke baseline.
+          # Writes Markdown to stdout — captured in logs and artifacts.
+          if [[ -f tests/k6/reports/stress-summary.json && -f tests/k6/reports/smoke-summary.json ]]; then
+            node scripts/compare-runs.js \
+              tests/k6/reports/smoke-summary.json \
+              tests/k6/reports/stress-summary.json \
+              | tee tests/k6/reports/comparison-stress-vs-smoke.md
+          else
+            echo "Skipping comparison — one or both summary files missing."
+          fi
+
+      - name: OWASP ZAP baseline scan (passive, non-blocking)
+        continue-on-error: true
+        run: |
+          mkdir -p tests/zap
+          NETWORK=$(docker inspect telco-reliability-lab-api-1 \
+            --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null | head -1)
+          docker run --rm \
+            --network "${NETWORK:-telco-reliability-lab_default}" \
+            -v "$(pwd)/tests/zap:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://api:3000 \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
+            -I -l WARN || true
+
       - name: Collect container logs
         if: always()
         run: docker compose logs --no-color > perf-stack-logs.txt 2>&1 || true
@@ -72,6 +103,7 @@ jobs:
           name: scheduled-performance-reports
           path: |
             tests/k6/reports/
+            tests/zap/
             perf-stack-logs.txt
           if-no-files-found: warn
 

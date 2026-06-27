@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
 
-.PHONY: help up down logs ps seed build test smoke load stress spike soak degradation degradation smoke-breach fault-clear
+.PHONY: help up down logs ps seed build test smoke load stress spike soak degradation smoke-breach compare-runs zap-smoke fault-clear
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -89,6 +89,14 @@ smoke-breach: ## Demo pipeline failure: injects payment latency then runs smoke 
 	curl -fsS -X DELETE http://localhost:3000/admin/faults >/dev/null; \
 	echo "--- Fault cleared ---"; \
 	exit $$EXIT
+
+compare-runs: ## Compare two k6 summary JSONs for regressions (BASELINE=path CURRENT=path)
+	node scripts/compare-runs.js \
+		$(or $(BASELINE),tests/k6/reports/smoke-summary.json) \
+		$(or $(CURRENT),tests/k6/reports/load-summary.json)
+
+zap-smoke: ## Run OWASP ZAP baseline scan against the local API (passive, non-blocking)
+	TARGET=http://localhost:3000 ./scripts/zap-smoke.sh
 
 fault-clear: ## Clear any active fault injection
 	curl -fsS -X DELETE http://localhost:3000/admin/faults && echo

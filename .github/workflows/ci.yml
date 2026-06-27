@@ -60,6 +60,22 @@ jobs:
             --summary-export /scripts/reports/smoke-summary.json \
             /scripts/scenarios/smoke.js
 
+      - name: OWASP ZAP baseline scan (passive security smoke, non-blocking)
+        continue-on-error: true
+        run: |
+          mkdir -p tests/zap
+          NETWORK=$(docker inspect telco-reliability-lab-api-1 \
+            --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null | head -1)
+          docker run --rm \
+            --network "${NETWORK:-telco-reliability-lab_default}" \
+            -v "$(pwd)/tests/zap:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://api:3000 \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json \
+            -I -l WARN || true
+
       - name: Collect container logs
         if: always()
         run: docker compose logs --no-color > k6-stack-logs.txt 2>&1 || true
@@ -71,6 +87,7 @@ jobs:
           name: performance-smoke-evidence
           path: |
             tests/k6/reports/
+            tests/zap/
             k6-stack-logs.txt
           if-no-files-found: warn
 
