@@ -22,7 +22,8 @@ injection, and CI quality gates that can block a release on reliability.
   and Grafana wired for metric → trace → log correlation.
 - **Fault injection** — inject latency / errors / timeouts at runtime to drive
   the degradation demo (env-gated; lab only).
-- **CI/CD** — GitHub Actions and GitLab CI running the smoke profile as a gate.
+- **Functional tests** — Playwright API integration tests covering auth guards, schema validation, invoice access control, and the **payment idempotency invariant** (same `Idempotency-Key` must never produce a second charge).
+- **CI/CD** — GitHub Actions and GitLab CI: unit tests + typecheck + Playwright API tests + k6 smoke as quality gates; scheduled stress/spike/soak with run-to-run regression comparison and OWASP ZAP passive scan.
 
 ## Architecture
 
@@ -114,6 +115,26 @@ payment p95 breaching budget → open a slow trace in Tempo → the time is in
 
 Rationale: [`docs/slo-definition.md`](docs/slo-definition.md).
 
+## API integration tests (Playwright)
+
+The `tests/api/` suite uses Playwright's `APIRequestContext` — no browser, pure HTTP. It runs against the live stack and validates:
+
+| File | What it covers |
+|---|---|
+| `health.spec.ts` | `/health/live` liveness, `/health` readiness (DB + Redis deps) |
+| `auth.spec.ts` | Login happy path, wrong password → 401, schema validation → 400, no user enumeration |
+| `invoices.spec.ts` | Authenticated list, no token → 401, cross-customer → 403 |
+| `plan-changes.spec.ts` | Schedule → 202, same plan → 422, cross-customer → 403 |
+| `payments.spec.ts` | Missing `Idempotency-Key` → 400, cross-customer → 403, **idempotent replay → same `paymentId`** |
+
+```bash
+make up          # boot the stack
+make api-test    # run all Playwright API tests
+make api-test-report  # open the HTML report
+```
+
+The idempotency test (⭐ in test output) is the most critical: it proves a network retry cannot double-charge a customer by verifying that two identical `POST /payments` calls with the same key return the same `paymentId`.
+
 ## Local development (API without Docker)
 
 ```bash
@@ -128,15 +149,18 @@ Regenerate seed data: `node infra/postgres/generate-seed.mjs`.
 ## Project layout
 
 ```
-apps/api/              Fastify TypeScript API (system under test) + unit tests
+apps/api/              Fastify TypeScript API (system under test) + unit tests (Vitest)
 apps/web/              Demo self-management UI (static SPA, nginx reverse-proxies /api)
+tests/api/             Playwright API integration tests (no browser — pure HTTP)
 tests/k6/              Performance suite: scenarios, profiles, thresholds, helpers
+tests/zap/             OWASP ZAP passive scan reports (generated; gitignored)
 observability/         OTel Collector, Tempo, Loki, Prometheus, Grafana (4 dashboards as code)
 infra/postgres/        Schema + deterministic synthetic seed
-scripts/               verify-stack.sh — one-command end-to-end stack verification
-docs/                  Architecture, SLOs, strategy, reliability, observability, interview
-.github/ · .gitlab-ci  CI pipelines: smoke gate (PR) + scheduled stress/spike (non-gating)
+scripts/               verify-stack.sh, compare-runs.js, zap-smoke.sh
+docs/                  Architecture, SLOs, strategy, reliability, observability, runbook, interview
+.github/ · .gitlab-ci  CI pipelines: unit + Playwright + smoke gates; scheduled diagnostic + ZAP
 docker-compose.yml     One-command reproducible environment
+playwright.config.ts   Playwright config (API tests, no browser)
 ```
 
 ## Documentation
@@ -150,8 +174,8 @@ docker-compose.yml     One-command reproducible environment
 
 ## Roadmap
 
-k6 on Kubernetes (k6-operator), Alertmanager, OpenAPI contract validation, OWASP
-ZAP smoke, run-to-run comparison, executive Markdown report, ArgoCD/GitOps.
+k6 on Kubernetes (k6-operator), Alertmanager, OpenAPI contract validation,
+Alertmanager webhook + PagerDuty routing, ArgoCD/GitOps.
 
 ## Disclaimer
 

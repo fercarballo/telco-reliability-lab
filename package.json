@@ -1,0 +1,11 @@
+{
+  "name": "telco-reliability-lab",
+  "private": true,
+  "scripts": {
+    "test:api": "playwright test",
+    "test:api:report": "playwright show-report tests/api/reports"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

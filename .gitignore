@@ -21,6 +21,11 @@ tests/k6/reports/*
 !tests/k6/reports/*.html
 !tests/k6/reports/*.json
 
+# Playwright — generated reports; uploaded as CI artifacts, not committed.
+tests/api/reports/
+playwright-report/
+test-results/
+
 # OS / editor
 .DS_Store
 .idea/

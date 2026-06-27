@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
 
-.PHONY: help up down logs ps seed build test smoke load stress spike soak degradation smoke-breach compare-runs zap-smoke fault-clear
+.PHONY: help up down logs ps seed build test api-test smoke load stress spike soak degradation smoke-breach compare-runs zap-smoke fault-clear
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -33,6 +33,12 @@ build: ## Typecheck + build the API
 
 test: ## Run API unit tests
 	cd apps/api && npm test
+
+api-test: ## Run Playwright API integration tests (stack must be running: make up)
+	npx playwright test tests/api/
+
+api-test-report: ## Open the last Playwright API test HTML report
+	npx playwright show-report tests/api/reports
 
 # RW = stream live metrics to Prometheus so the "k6 Test Run" dashboard fills in.
 # HTML = export a static web-dashboard report; open tests/k6/reports/<profile>-report.html after the run.
