@@ -25,6 +25,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 15s   # schema init runs on first boot; don't burn retries during it
 
   redis:
     image: redis:8-alpine
@@ -35,6 +36,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 5s
 
   # ----------------------------------------------------------- observability
   otel-collector:
@@ -134,6 +136,9 @@ services:
       REDIS_PORT: "6379"
       JWT_SECRET: lab-only-secret-change-me
       DEPLOYMENT_ENVIRONMENT: local
+      # DB connection pool: 10 is sufficient for smoke/load; raise to 25 for stress/soak.
+      # PostgreSQL default max_connections is 100, so this leaves headroom for pgAdmin / CI.
+      PG_POOL_MAX: "10"
       FAULT_INJECTION_ENABLED: "true"
       LOG_PRETTY: "false"
       LOKI_ENABLED: "true"
@@ -166,6 +171,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+      start_period: 10s
 
   # ----------------------------------------------------------- demo web UI
   # Static self-management portal served by nginx, which also reverse-proxies

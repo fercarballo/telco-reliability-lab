@@ -9,7 +9,7 @@ import { maybeInjectFault } from '../faults';
 import { withSpan } from '../tracing';
 import { businessPaymentsTotal, paymentIdempotencyConflicts } from '../metrics';
 import { forbidIfNotOwner } from '../lib/route-utils';
-import { PaymentCache } from '../lib/constants';
+import { PaymentCache, InvoiceStatus } from '../lib/constants';
 
 interface PaymentBody {
   customerId: string;
@@ -141,13 +141,12 @@ export default async function paymentRoutes(app: FastifyInstance) {
         return reply.code(200).send(outcome.result);
       }
 
-      // Cache the settled result for fast future replays.
-      await redis.set(
-        `${PaymentCache.PREFIX}${idempotencyKey}`,
-        JSON.stringify(outcome.result),
-        'EX',
-        PaymentCache.TTL_SEC,
-      );
+      // Cache the settled result for fast future replays. Fire-and-forget: a cache
+      // miss is safe (we fall through to the DB constraint), so don't make the
+      // caller wait for the Redis round-trip before receiving their response.
+      redis
+        .set(`${PaymentCache.PREFIX}${idempotencyKey}`, JSON.stringify(outcome.result), 'EX', PaymentCache.TTL_SEC)
+        .catch((err) => request.log.warn({ err }, 'payment cache write failed'));
 
       businessPaymentsTotal.inc({ status: outcome.result.status });
       request.log.info(
@@ -175,6 +174,14 @@ async function settleWonPayment(
   if (!invoice) {
     await client.query("UPDATE payments SET status = 'declined' WHERE payment_id = $1", [input.paymentId]);
     return { paymentStatus: 'declined', invoiceStatus: 'unknown' };
+  }
+
+  // Reject attempts to re-pay an already-settled invoice (different idempotency key
+  // but same invoice). Without this, concurrent payments with distinct keys could
+  // both pass the idempotency insert and both attempt to charge the same invoice.
+  if (invoice.status === InvoiceStatus.PAID) {
+    await client.query("UPDATE payments SET status = 'declined' WHERE payment_id = $1", [input.paymentId]);
+    return { paymentStatus: 'declined', invoiceStatus: invoice.status };
   }
 
   const gatewayStatus = await callPaymentGateway(input.amount, input.method);
