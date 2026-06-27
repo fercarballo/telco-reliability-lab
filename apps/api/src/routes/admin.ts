@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config';
+import { pool } from '../db';
 import { clearFaults, isValidFault, isValidTarget, listFaults, setFault } from '../faults';
 
 interface FaultBody {
@@ -56,5 +57,14 @@ export default async function adminRoutes(app: FastifyInstance) {
     clearFaults();
     request.log.warn('all faults cleared');
     return reply.code(200).send({ cleared: true });
+  });
+
+  // Reset all invoices to 'pending' so every k6 run starts with payable invoices.
+  // The payment journey is the highest-risk flow; without this, invoices drain to
+  // 'paid' across runs and the journey stops being exercised.
+  app.post('/admin/reset-invoices', async (request, reply) => {
+    const result = await pool.query("UPDATE invoices SET status = 'pending'");
+    request.log.warn({ rowCount: result.rowCount }, 'invoices reset to pending');
+    return reply.code(200).send({ reset: true, invoicesUpdated: result.rowCount });
   });
 }

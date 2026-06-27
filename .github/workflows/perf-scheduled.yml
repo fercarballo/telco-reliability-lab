@@ -42,6 +42,7 @@ jobs:
         continue-on-error: true
         run: |
           docker compose run --rm -T k6 run -o experimental-prometheus-rw \
+            --out 'web-dashboard=export=/scripts/reports/stress-report.html' \
             --summary-export /scripts/reports/stress-summary.json /scripts/scenarios/stress.js
 
       - name: Spike
@@ -49,6 +50,7 @@ jobs:
         continue-on-error: true
         run: |
           docker compose run --rm -T k6 run -o experimental-prometheus-rw \
+            --out 'web-dashboard=export=/scripts/reports/spike-report.html' \
             --summary-export /scripts/reports/spike-summary.json /scripts/scenarios/spike.js
 
       - name: Soak
@@ -56,6 +58,7 @@ jobs:
         continue-on-error: true
         run: |
           docker compose run --rm -T k6 run -o experimental-prometheus-rw \
+            --out 'web-dashboard=export=/scripts/reports/soak-report.html' \
             --summary-export /scripts/reports/soak-summary.json /scripts/scenarios/soak.js
 
       - name: Collect container logs

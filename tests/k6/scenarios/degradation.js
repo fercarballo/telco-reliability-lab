@@ -11,6 +11,7 @@ import { fullJourney } from '../helpers/journeys.js';
 import { profiles } from '../profiles/profiles.js';
 import { diagnosticThresholds } from '../thresholds/thresholds.js';
 import { summaryTrendStats, BASE_URL } from '../helpers/config.js';
+import { resetInvoices } from '../helpers/setup.js';
 
 export const options = {
   scenarios: { degradation: { ...profiles.degradation, exec: 'journey' } },
@@ -19,6 +20,7 @@ export const options = {
 };
 
 export function setup() {
+  resetInvoices();
   const res = http.post(
     `${BASE_URL}/admin/faults`,
     JSON.stringify({ target: 'payments', fault: 'latency', rate: 0.3, latencyMs: 2000, durationSec: 600 }),

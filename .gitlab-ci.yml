@@ -74,6 +74,7 @@ performance:smoke:
         sleep 2
       done
     - docker compose run --rm -T -e BASE_URL=http://api:3000 k6 run
+        --out 'web-dashboard=export=/scripts/reports/smoke-report.html'
         --summary-export /scripts/reports/smoke-summary.json
         /scripts/scenarios/smoke.js
   after_script:
@@ -111,8 +112,10 @@ performance:diagnostic:
         sleep 2
       done
     - docker compose run --rm -T k6 run -o experimental-prometheus-rw
+        --out 'web-dashboard=export=/scripts/reports/stress-report.html'
         --summary-export /scripts/reports/stress-summary.json /scripts/scenarios/stress.js || true
     - docker compose run --rm -T k6 run -o experimental-prometheus-rw
+        --out 'web-dashboard=export=/scripts/reports/spike-report.html'
         --summary-export /scripts/reports/spike-summary.json /scripts/scenarios/spike.js || true
   after_script:
     - docker compose down -v || true
