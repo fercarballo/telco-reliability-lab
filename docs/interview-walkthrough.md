@@ -68,11 +68,15 @@ Alertmanager → webhook → structured log — visible in Grafana Explore.
 > "In production this webhook points to PagerDuty. In the lab it closes the
 > loop locally — no external dependencies."
 
-## 8. Correctness under concurrency (30s)
-**Show:** `docs/reliability-testing.md`.
-Idempotency is enforced by a Postgres `UNIQUE` constraint, not the application.
-Under concurrency the app can't arbitrate a race; a DB constraint can. Redis is
-only a fast-path cache for warm replays.
+## 8. Correctness under concurrency (45s)
+**Show:** `docs/reliability-testing.md` + `apps/api/src/routes/payments.ts` `settleWonPayment`.
+
+Two independent layers prevent double-charging:
+
+1. **Idempotency gate** — a Postgres `UNIQUE` constraint on `idempotency_key`; the app uses `INSERT ... ON CONFLICT DO NOTHING` and inspects `rowCount`. Under concurrency, two requests with the *same* key: the DB picks one winner, the other reads the existing record. Redis is only a fast-path cache.
+2. **Invoice status guard** — even with *different* idempotency keys, a payment against an already-`paid` invoice is declined before the gateway is called. This was identified as a correctness gap during a code audit and hardened in a dedicated commit (`apps/api/src/lib/constants.ts → InvoiceStatus.PAID` check).
+
+> "This is the kind of bug that is invisible in single-user testing and devastating in production. The audit caught it; the fix is one `if` block and one constant — and now it's tested automatically."
 
 ## 9. The quality gate (45s)
 **Show:** `.github/workflows/ci.yml`.
@@ -99,6 +103,9 @@ spike + run-to-run regression comparison + OWASP ZAP passive scan.
   to gate on; I still chart p99 for diagnosis.
 - **Why is idempotency in the DB, not the app?** Under concurrency the app can't
   arbitrate a race; a `UNIQUE` constraint can. Redis is only a fast cache.
+- **What if two *different* keys are used for the same invoice?** The `InvoiceStatus.PAID`
+  guard in `settleWonPayment` declines any payment attempt against an already-paid
+  invoice — found during a pre-release audit, hardened with a constant and a comment.
 - **Why are stress/spike non-gating?** They explore limits; gating on them would
   punish the test for succeeding. They publish reports instead.
 - **Open vs closed model?** Load uses arrival-rate (open) because real users

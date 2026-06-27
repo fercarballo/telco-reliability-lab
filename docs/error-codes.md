@@ -26,7 +26,7 @@ All error responses follow a consistent shape:
 | HTTP | `error` | Trigger |
 |------|---------|---------|
 | 400  | `missing_idempotency_key` | `POST /payments` was called without the required `Idempotency-Key` header, or the header value was blank. |
-| 400  | *(Fastify schema message)* | Request body fails JSON Schema validation — missing required fields, wrong type, value out of allowed range, or extra properties. The `message` field contains the specific schema violation. |
+| 400  | `validation_error` | Request body fails JSON Schema validation — missing required fields, wrong type, value out of allowed range, or extra properties. The `message` field contains the specific schema violation produced by Fastify's AJV validator. |
 
 ---
 
@@ -52,14 +52,24 @@ The check happens in two layers (fast-path Redis cache → authoritative DB cons
 
 ---
 
+## Unhandled / Internal Errors
+
+| HTTP | `error` | Trigger |
+|------|---------|---------|
+| 500  | `internal_error` | An unexpected exception was thrown inside a route handler that was not caught by any previous guard. Always logged at `level: 50` (error) with the full stack trace. |
+
+---
+
 ## Fault-Injection Errors (lab only)
 
 When `FAULT_INJECTION_ENABLED=true`, the `/admin/faults` endpoint can trigger artificial failures on any business route. These surface as:
 
-| HTTP | Cause |
-|------|-------|
-| 500  | `error` fault injected on the target service. |
-| 504  | `timeout` or `latency` fault causing the upstream call to exceed the configured deadline. |
+| HTTP | `error` | Cause |
+|------|---------|-------|
+| 500  | `injected_fault` | `error` fault type was injected on the target service. Response body also includes `faultType: "error"`. |
+| 504  | `injected_fault` | `timeout` fault type — handler hung for ≥ 5 s before throwing. Response body includes `faultType: "timeout"`. |
+
+For `latency` faults, the handler introduces the configured delay **without** returning an error — it resolves normally but slowly. The fault is visible as an elevated span duration in Tempo, not as a 5xx.
 
 Fault responses are not part of the production API contract. They exist to exercise error-handling paths in observability tooling and load tests.
 

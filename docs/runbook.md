@@ -116,7 +116,7 @@ docker compose logs -f api
 |---|---|---|
 | Login | < 600 ms | < 1% |
 | Invoice lookup | < 800 ms | < 1% |
-| Plan change | < 1200 ms | < 1% |
+| Plan change | < 1200 ms | < 1,5% |
 | Payment | < 1500 ms | < 1% |
 | Global p95 | < 1200 ms | — |
 | Checks | > 99% | — |

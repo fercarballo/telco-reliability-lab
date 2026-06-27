@@ -1,6 +1,6 @@
 # Database Schema
 
-The lab uses a single PostgreSQL database (`telco_lab`). All tables are created by [`infra/postgres/init/01-schema.sql`](../infra/postgres/init/01-schema.sql) and seeded by [`02-seed.sql`](../infra/postgres/init/02-seed.sql) on first boot.
+The lab uses a single PostgreSQL database (`telco`). All tables are created by [`infra/postgres/init/01-schema.sql`](../infra/postgres/init/01-schema.sql) and seeded by [`02-seed.sql`](../infra/postgres/init/02-seed.sql) on first boot.
 
 ---
 

@@ -1,126 +1,132 @@
-# Telco Reliability Lab — Executive Overview
+# Telco Reliability Lab — Resumen Ejecutivo
 
-**Audience:** IT managers, hiring managers, non-technical stakeholders
-**Purpose:** What this project is, what problem it solves, and what it demonstrates
-
----
-
-## What Is This Project?
-
-The **Telco Reliability Lab** is a complete, end-to-end quality assurance and reliability testing system built to simulate how a real telecommunications company protects its most critical customer-facing operations.
-
-It was built from scratch as a portfolio demonstration of senior-level QA and reliability engineering skills — the kind of work normally done inside a mature engineering organisation.
+**Audiencia:** Managers de IT, responsables de contratación, stakeholders no técnicos
+**Propósito:** Qué es este proyecto, qué problema resuelve y qué demuestra
 
 ---
 
-## What Problem Does It Solve?
+## ¿Qué es este proyecto?
 
-Telecom companies process millions of billing events, plan changes, and service requests every day. When those systems fail — or behave incorrectly under load — the consequences are direct and expensive:
+El **Telco Reliability Lab** es un sistema completo de aseguramiento de calidad y pruebas de fiabilidad construido para simular cómo una empresa de telecomunicaciones real protege sus operaciones más críticas orientadas al cliente.
 
-- **A billing system that charges customers twice** erodes trust and triggers chargebacks.
-- **A slow payment gateway** means customers give up before completing a transaction.
-- **A system that fails silently** means the engineering team finds out from angry customers, not from monitoring.
-- **A regression introduced by a new deployment** might go undetected until after business hours.
-
-This lab proves that all of those failure modes are being caught **before** they reach production — and that when something does go wrong, the team has the tools to find and fix it in minutes, not hours.
+Fue construido desde cero como demostración en portfolio de habilidades de ingeniería QA y fiabilidad de nivel senior — el tipo de trabajo que normalmente se realiza dentro de una organización de ingeniería madura.
 
 ---
 
-## What Was Built?
+## ¿Qué problema resuelve?
 
-The project contains six interconnected layers:
+Las empresas de telecomunicaciones procesan millones de eventos de facturación, cambios de plan y solicitudes de servicio cada día. Cuando esos sistemas fallan — o se comportan incorrectamente bajo carga — las consecuencias son directas y costosas:
 
-### 1. A Realistic API Service
-A working billing and account-management API — the same type of service found in real telco back-ends. Customers can log in, view invoices, pay them, and request plan upgrades.
+- **Un sistema de facturación que cobra dos veces** erosiona la confianza y genera contracargos.
+- **Una pasarela de pago lenta** hace que los clientes abandonen antes de completar una transacción.
+- **Un sistema que falla silenciosamente** significa que el equipo de ingeniería se entera por clientes enfadados, no por el monitoreo.
+- **Una regresión introducida en un nuevo despliegue** puede pasar desapercibida hasta después del horario laboral.
 
-### 2. Fault Injection
-The ability to deliberately break the system in controlled ways — simulating payment gateway timeouts, billing service errors, and cascading failures — to verify that monitoring catches them and the system recovers correctly.
-
-### 3. Performance Load Tests
-Automated scripts that simulate hundreds of concurrent users performing every business journey simultaneously, measuring how fast the system responds and how many errors it produces under realistic traffic.
-
-### 4. Full Observability Stack
-A monitoring dashboard (Grafana) connected to four data sources:
-- **Metrics** — real-time performance numbers (response times, error rates, payment volume).
-- **Logs** — a structured record of every request with context for debugging.
-- **Traces** — a step-by-step map of how each request moved through the system, including database queries and external calls.
-- **Alerts** — automated notifications when key indicators breach defined thresholds.
-
-### 5. Security Validation
-Automated scans (OWASP ZAP) that test the API for common web vulnerabilities — ensuring no security regressions are introduced between releases.
-
-### 6. Automated CI/CD Pipeline
-Every code change runs the full test suite automatically — integration tests, load tests, security scans, and OpenAPI spec validation — before anything reaches a production-like environment.
+Este laboratorio demuestra que todos esos modos de fallo se detectan **antes** de llegar a producción — y que cuando algo va mal, el equipo tiene las herramientas para encontrarlo y corregirlo en minutos, no en horas.
 
 ---
 
-## What Risks Does It Catch?
+## ¿Qué se construyó?
 
-| Risk | How It Is Caught |
-|------|-----------------|
-| Payment processed twice (duplicate charge) | Idempotency key enforcement — tested in both API tests and load tests |
-| Customer A accessing Customer B's data | Cross-customer auth guard — tested with 403 assertions in every route |
-| Payment gateway becoming slow under load | Per-journey latency SLOs with p95 thresholds in Grafana |
-| Silent error rate increase after deployment | Prometheus alerts fire when error rate exceeds 1% |
-| Breaking change in the API contract | OpenAPI 3.1 spec is linted on every CI run |
-| Common web security vulnerabilities | OWASP ZAP automated scan in the pipeline |
-| Invoices draining to "paid" between test runs | Admin reset endpoint — runs automatically before every load test |
+El proyecto contiene seis capas interconectadas:
 
----
+### 1. Un servicio API realista
+Una API de gestión de facturación y cuentas funcional — el mismo tipo de servicio que se encuentra en los back-ends reales de operadoras telco. Los clientes pueden autenticarse, ver facturas, pagarlas y solicitar cambios de plan.
 
-## What Does "Production-Ready" Mean Here?
+### 2. Inyección de fallos
+La capacidad de romper el sistema de forma controlada — simulando timeouts de pasarela de pago, errores del servicio de facturación y fallos en cascada — para verificar que el monitoreo los detecta y el sistema se recupera correctamente.
 
-This is a lab environment — it runs on a developer laptop using Docker. But every technical decision was made as it would be in a real production system:
+### 3. Pruebas de carga de rendimiento
+Scripts automatizados que simulan cientos de usuarios concurrentes realizando todos los flujos de negocio simultáneamente, midiendo la velocidad de respuesta del sistema y el número de errores que produce bajo tráfico realista.
 
-- **No test mocks for the database** — tests hit a real PostgreSQL instance, so SQL bugs surface rather than being hidden behind mocked responses.
-- **Idempotency enforced at the database level** — the `UNIQUE(idempotency_key)` constraint means concurrent duplicate payments are rejected even if two requests arrive simultaneously.
-- **Secrets are environment variables** — no credentials in source code; the CI pipeline injects them at runtime.
-- **Observability is wired end-to-end** — a single slow database query surfaces in Grafana Tempo as a visible span, making root-cause analysis fast and precise.
-- **Alerts are routed through the API** — Prometheus fires → Alertmanager routes → the API logs it via pino → Loki stores it — the complete alert chain is demonstrable.
+### 4. Stack de observabilidad completo
+Un dashboard de monitoreo (Grafana) conectado a cuatro fuentes de datos:
+- **Métricas** — números de rendimiento en tiempo real (tiempos de respuesta, tasas de error, volumen de pagos).
+- **Logs** — un registro estructurado de cada petición con contexto para depuración.
+- **Trazas** — un mapa paso a paso de cómo cada petición se movió a través del sistema, incluyendo consultas a base de datos y llamadas externas.
+- **Alertas** — notificaciones automáticas cuando los indicadores clave superan los umbrales definidos.
 
----
+### 5. Validación de seguridad
+Escaneos automatizados (OWASP ZAP) que prueban la API en busca de vulnerabilidades web comunes — garantizando que no se introduzcan regresiones de seguridad entre versiones.
 
-## Key Numbers
-
-| Metric | Value |
-|--------|-------|
-| API routes covered by integration tests | 100% |
-| Test scenarios automated in CI | 21 |
-| Business journeys exercised under load | 4 (login, invoice lookup, plan change, payment) |
-| Observability signals collected | 4 (metrics, logs, traces, alerts) |
-| OWASP ZAP findings blocking deployment | 0 |
-| Time to detect a latency regression | < 30 seconds (Prometheus scrape interval) |
+### 6. Pipeline CI/CD automatizado
+Cada cambio de código ejecuta automáticamente la suite de pruebas completa — tests de integración, pruebas de carga, escaneos de seguridad y validación de especificación OpenAPI — antes de que nada llegue a un entorno similar a producción.
 
 ---
 
-## How To See It Running
+## ¿Qué riesgos detecta?
+
+| Riesgo | Cómo se detecta |
+|--------|-----------------|
+| Pago procesado dos veces (cargo duplicado) | Guard de idempotencia en DB + tests de replay en API y pruebas de carga |
+| Cliente A accediendo a los datos del cliente B | Guard de autorización cross-customer — probado con assertions 403 en cada ruta |
+| Pasarela de pago lenta bajo carga | SLOs de latencia por journey con umbrales p95 en Grafana |
+| Aumento silencioso de tasa de error tras despliegue | Las alertas de Prometheus se disparan cuando la tasa de error supera el 1% |
+| Cambio incompatible en el contrato de la API | La especificación OpenAPI 3.1 se valida en cada ejecución de CI |
+| Vulnerabilidades de seguridad web comunes | Escaneo automatizado OWASP ZAP en el pipeline |
+| Facturas consumidas entre ejecuciones de prueba | Endpoint de reset admin — se ejecuta automáticamente antes de cada prueba de carga |
+
+---
+
+## ¿Qué significa "listo para producción" aquí?
+
+Este es un entorno de laboratorio — se ejecuta en un portátil de desarrollo usando Docker. Pero cada decisión técnica se tomó como se haría en un sistema real de producción:
+
+- **Sin mocks de base de datos en los tests** — las pruebas acceden a una instancia PostgreSQL real, por lo que los bugs SQL emergen en lugar de quedar ocultos detrás de respuestas simuladas.
+- **Idempotencia aplicada a nivel de base de datos** — la restricción `UNIQUE(idempotency_key)` garantiza que los pagos duplicados concurrentes sean rechazados incluso si dos peticiones llegan simultáneamente.
+- **Los secretos son variables de entorno** — sin credenciales en el código fuente; el pipeline de CI las inyecta en tiempo de ejecución.
+- **La observabilidad está conectada de extremo a extremo** — una única consulta lenta a base de datos aparece en Grafana Tempo como un span visible, haciendo el análisis de causa raíz rápido y preciso.
+- **Las alertas se enrutan a través de la API** — Prometheus dispara → Alertmanager enruta → la API lo registra vía pino → Loki lo almacena — toda la cadena de alertas es demostrable.
+
+---
+
+## Números clave
+
+| Métrica | Valor |
+|---------|-------|
+| Rutas API cubiertas por tests de integración | 100% |
+| Escenarios de prueba automatizados en CI | 21 |
+| Journeys de negocio ejercitados bajo carga | 4 (login, consulta facturas, cambio de plan, pago) |
+| Señales de observabilidad recopiladas | 4 (métricas, logs, trazas, alertas) |
+| Hallazgos de OWASP ZAP que bloquean despliegue | 0 |
+| Tiempo para detectar una regresión de latencia | < 30 segundos (intervalo de scrape de Prometheus) |
+
+---
+
+## Cómo verlo en funcionamiento
 
 ```bash
-# Start the entire stack (API, database, monitoring)
+# Levantar todo el stack (API, base de datos, monitoreo)
 docker compose up -d
 
-# Run all integration tests
+# Ejecutar todos los tests de integración
 npx playwright test tests/api/
 
-# Run the load test
+# Ejecutar la prueba de carga
 make smoke
 
-# Open the dashboards
+# Abrir los dashboards
 open http://localhost:3001   # Grafana (admin / admin)
 
-# Trigger a fault and watch it appear in the dashboard
-make inject-fault TARGET=payments FAULT=error
+# Inyectar un fallo y observarlo en el dashboard en tiempo real
+curl -X POST http://localhost:3000/admin/faults \
+  -H 'Content-Type: application/json' \
+  -d '{"target":"payments","fault":"latency","rate":1.0,"latencyMs":2000,"durationSec":120}'
+
+# Limpiar el fallo
+make fault-clear
 ```
 
-Everything required to demonstrate this system from scratch is documented in the [main README](../README.md) and the [interview walkthrough](interview-walkthrough.md).
+Todo lo necesario para demostrar este sistema desde cero está documentado en el [README principal](../README.md) y en la [guía de entrevista técnica](interview-walkthrough.md).
 
 ---
 
-## Why This Matters in an Interview
+## Por qué importa en una entrevista
 
-This project answers the hardest interview questions with working code instead of verbal claims:
+Este proyecto responde las preguntas más difíciles de entrevista con código funcional en lugar de afirmaciones verbales:
 
-- *"How do you test payment idempotency?"* → `tests/api/payments.spec.ts` line 73 — the replay test runs live.
-- *"How do you catch performance regressions?"* → k6 thresholds breach → Grafana alert fires — demonstrable in under 2 minutes.
-- *"How do you approach observability?"* → Open a Grafana dashboard and trace a specific payment end-to-end through metrics, logs, and spans.
-- *"How do you handle fault tolerance?"* → Inject a payment gateway timeout, watch the error rate climb in real time, clear the fault, watch it recover.
+- *"¿Cómo pruebas la idempotencia de pagos?"* → `tests/api/payments.spec.ts` línea 73 — el test de replay se ejecuta en vivo.
+- *"¿Cómo detectas regresiones de rendimiento?"* → Los umbrales de k6 se incumplen → la alerta de Grafana se dispara — demostrable en menos de 2 minutos.
+- *"¿Cómo enfocas la observabilidad?"* → Abrir un dashboard de Grafana y trazar un pago específico de extremo a extremo a través de métricas, logs y spans.
+- *"¿Cómo gestionas la tolerancia a fallos?"* → Inyectar un timeout en la pasarela de pago, observar la tasa de error subir en tiempo real, limpiar el fallo, observar la recuperación.
+- *"¿Cómo evitas cobrar dos veces a un cliente?"* → La restricción `UNIQUE(idempotency_key)` en PostgreSQL + guard de `InvoiceStatus.PAID` antes de llamar al gateway — dos líneas de defensa probadas con tests automáticos.

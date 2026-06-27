@@ -1,5 +1,26 @@
 # Architecture
 
+## Tech stack
+
+| Layer | Technology | Version |
+|-------|------------|---------|
+| Runtime | Node.js | 24 (LTS) |
+| Language | TypeScript | 6.x |
+| HTTP framework | Fastify | 5.x |
+| Database | PostgreSQL | 17 |
+| Cache / session store | Redis | 8 |
+| Performance testing | k6 | latest |
+| Functional testing | Playwright (`APIRequestContext`) | 1.49+ |
+| Metrics | prom-client → Prometheus | 15.x → latest |
+| Distributed tracing | OpenTelemetry → OTel Collector → Grafana Tempo | auto-instrumentations 0.77+ |
+| Structured logs | pino + pino-loki → Grafana Loki | 10.x |
+| Dashboards | Grafana | latest |
+| Alerting | Prometheus alert rules + Alertmanager | latest |
+| API contract | OpenAPI 3.1 (Redocly lint) | — |
+| Security scan | OWASP ZAP baseline | stable |
+| CI | GitHub Actions + GitLab CI | — |
+| Container runtime | Docker + Docker Compose | — |
+
 ## System under test
 
 A deliberately small but realistic telco self-management API. The four journeys
@@ -54,6 +75,14 @@ Synthetic users (k6) ─┐
 
 - **Fault injection is in-process and env-gated.** No external chaos tooling
   needed for the demo; `FAULT_INJECTION_ENABLED` must be true (local/CI only).
+
+## Security model
+
+Authentication uses **stateless JWT** (HS256, signed with `JWT_SECRET`). Every protected route registers `preHandler: app.authenticate`, which verifies the token via `@fastify/jwt` and writes `request.authCustomerId = jwt.sub`. Route handlers then call `forbidIfNotOwner(request, reply, resourceCustomerId)` to enforce that a customer cannot access another customer's data — returning `403 forbidden` on mismatch.
+
+Admin endpoints (`/admin/*`) are gated separately by `FAULT_INJECTION_ENABLED`. If the env flag is `false`, all admin routes return `403 disabled` regardless of the caller's identity.
+
+Secrets (`password`, `authorization`, tokens) are scrubbed from all log lines by pino's `redact` configuration — even if a handler accidentally serialises the request object.
 
 ## Request lifecycle (payment)
 

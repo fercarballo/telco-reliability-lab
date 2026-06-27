@@ -5,14 +5,24 @@
 Every profile answers a *different* question. Running "more load" is not a
 strategy; matching a test shape to a business risk is.
 
-| Profile | Question it answers | When | Gating? |
+| Profile | Question it answers | Approx. duration | When | Gating? |
+|---|---|---|---|---|
+| **Smoke** | Does the system work at all, within SLO, at trivial load? | ~1 min | Every PR / push | ✅ Yes |
+| **Load** | Do we meet SLOs at *expected* traffic? | ~9 min | Merge to main | ✅ Yes |
+| **Stress** | Where is the saturation point — what breaks first? | ~14 min | Scheduled nightly | ❌ No |
+| **Spike** | Can we survive and recover from a sudden burst? | ~5 min | Scheduled nightly | ❌ No |
+| **Soak** | Do we degrade over time (leaks, creeping latency)? | 30 min | Scheduled weekly | ❌ No |
+| **Degradation** | Can we *diagnose* a fault through the observability stack? | ~5 min | Demo / on-call drill | ❌ No |
+
+## CI job mapping
+
+| CI job | Profiles run | Trigger | Blocks merge? |
 |---|---|---|---|
-| **Smoke** | Does the system work at all, within SLO, at trivial load? | Every PR | ✅ Yes |
-| **Load** | Do we meet SLOs at *expected* traffic? | Merge to main | ✅ Yes |
-| **Stress** | Where is the saturation point — what breaks first? | Scheduled / manual | ❌ No |
-| **Spike** | Can we survive and recover from a sudden burst? | Scheduled / manual | ❌ No |
-| **Soak** | Do we degrade over time (leaks, creeping latency)? | Nightly / scheduled | ❌ No |
-| **Degradation** | Can we *diagnose* a fault through the observability stack? | Demo / on-call drill | ❌ No |
+| `build-test` | — (typecheck + unit tests + build) | Every push / PR | ✅ Yes |
+| `spec-lint` | — (OpenAPI contract validation) | Every push / PR | ✅ Yes |
+| `api-integration` | — (21 Playwright tests) | Every push / PR | ✅ Yes |
+| `performance-smoke` | smoke + OWASP ZAP | Every push / PR | ✅ Yes |
+| Scheduled (nightly) | stress, spike, run-to-run comparison | Cron | ❌ No (`continue-on-error`) |
 
 ## Why some profiles are non-gating
 
