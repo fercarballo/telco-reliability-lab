@@ -1,0 +1,24 @@
+# Grafana Tempo 3.x — single-binary, local filesystem storage (lab use only).
+# Tempo 3.0 trimmed several top-level blocks; defaults are fine for a lab, so we
+# keep only what we must set: the HTTP/gRPC server, the OTLP receivers, and
+# local trace storage.
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks

@@ -1,0 +1,97 @@
+{
+  "uid": "telco-reliability-degradation",
+  "title": "Telco — Reliability & Degradation",
+  "tags": ["telco", "reliability", "faults"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active faults",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short",
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(fault_injection_active)" }]
+    },
+    {
+      "type": "stat",
+      "title": "Payment error rate",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 2,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "100 * sum(rate(http_request_errors_total{service=\"telco-api\",route=\"/payments\"}[1m])) / clamp_min(sum(rate(http_requests_total{service=\"telco-api\",route=\"/payments\"}[1m])), 1)" }]
+    },
+    {
+      "type": "stat",
+      "title": "Payment p95 (SLO < 1500ms)",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1500 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/payments\"}[5m])))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Idempotent replays (total)",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(business_payment_idempotency_conflicts_total)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Payment latency p50 / p95 / p99 — before / during / after fault",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 5, "showPoints": "never" } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "p50",
+          "expr": "1000 * histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/payments\"}[1m])))" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "p95",
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/payments\"}[1m])))" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "p99",
+          "expr": "1000 * histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/payments\"}[1m])))" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Active faults by target / type",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "showPoints": "never", "lineInterpolation": "stepAfter" }, "max": 1 }, "overrides": [] },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "fault_injection_active", "legendFormat": "{{target}} / {{fault}}" }]
+    },
+    {
+      "type": "logs",
+      "title": "API logs — warnings & errors (level ≥ 40)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true },
+      "targets": [{ "refId": "A", "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "{service_name=\"telco-api\"} | json | level >= 40" }]
+    },
+    {
+      "type": "logs",
+      "title": "API logs — /payments (pivot by trace_id → Tempo)",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true },
+      "targets": [{ "refId": "A", "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "{service_name=\"telco-api\"} | json | route=\"/payments\"" }]
+    }
+  ]
+}

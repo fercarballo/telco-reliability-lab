@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Telco Self-Management — Reliability Lab</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span> Telco<strong>Care</strong>
+        <span class="tag">Reliability Lab demo</span>
+      </div>
+      <div id="who" class="who hidden"></div>
+    </header>
+
+    <main class="container">
+      <!-- Login -->
+      <section id="loginCard" class="card narrow">
+        <h2>Sign in</h2>
+        <p class="muted">Synthetic users: <code>user_001</code> … <code>user_050</code>, password <code>password123</code>.</p>
+        <label>Username <input id="username" value="user_001" autocomplete="off" /></label>
+        <label>Password <input id="password" type="password" value="password123" /></label>
+        <button id="loginBtn" class="primary">Log in</button>
+        <p id="loginError" class="error hidden"></p>
+      </section>
+
+      <!-- App (after login) -->
+      <section id="app" class="hidden">
+        <div class="grid">
+          <!-- Invoices -->
+          <div class="card">
+            <div class="card-head">
+              <h2>Invoices</h2>
+              <button id="refreshInvoices" class="ghost">Refresh</button>
+            </div>
+            <table class="invoices">
+              <thead><tr><th>Invoice</th><th>Amount</th><th>Status</th><th>Due</th><th></th></tr></thead>
+              <tbody id="invoiceRows"><tr><td colspan="5" class="muted">—</td></tr></tbody>
+            </table>
+          </div>
+
+          <!-- Plan change -->
+          <div class="card">
+            <h2>Change plan</h2>
+            <label>Target plan
+              <select id="targetPlan">
+                <option value="mobile_basic">Mobile Basic</option>
+                <option value="mobile_premium">Mobile Premium</option>
+                <option value="fiber_300mb">Fiber 300</option>
+                <option value="fiber_600mb" selected>Fiber 600</option>
+                <option value="fiber_1000mb">Fiber 1000</option>
+              </select>
+            </label>
+            <button id="changePlanBtn" class="primary">Request change</button>
+
+            <hr />
+
+            <!-- Fault injection (demo only) -->
+            <h2>Fault injection <span class="tag warn">demo</span></h2>
+            <div class="row">
+              <select id="faultTarget">
+                <option value="payments">payments</option>
+                <option value="billing">billing</option>
+                <option value="plans">plans</option>
+                <option value="auth">auth</option>
+                <option value="global">global</option>
+              </select>
+              <select id="faultType">
+                <option value="latency">latency</option>
+                <option value="error">error</option>
+                <option value="timeout">timeout</option>
+              </select>
+            </div>
+            <div class="row">
+              <button id="injectFaultBtn" class="warn">Inject (2s, 30%, 5m)</button>
+              <button id="clearFaultBtn" class="ghost">Clear faults</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity log -->
+        <div class="card">
+          <div class="card-head">
+            <h2>Activity</h2>
+            <button id="logout" class="ghost">Log out</button>
+          </div>
+          <pre id="activity" class="activity"></pre>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

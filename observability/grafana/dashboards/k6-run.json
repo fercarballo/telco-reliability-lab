@@ -1,0 +1,105 @@
+{
+  "uid": "telco-k6-run",
+  "title": "Telco — k6 Test Run",
+  "tags": ["telco", "k6", "load"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": { "mode": "markdown", "content": "These panels read **k6 Prometheus remote-write** metrics (`k6_*`). Populate them by running a profile with remote-write enabled, e.g. `make load` / `make degradation` (which add `-o experimental-prometheus-remote-write`). The plain `make smoke` gate does not push to Prometheus." }
+    },
+    {
+      "type": "stat",
+      "title": "Active VUs",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_vus" }]
+    },
+    {
+      "type": "stat",
+      "title": "Requests / s",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(k6_http_reqs_total[1m]))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Iterations / s",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(k6_iterations_total[1m]))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Checks pass rate",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 0.99 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_checks_rate" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "VUs",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_vus", "legendFormat": "vus" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_vus_max", "legendFormat": "vus_max" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate & failures",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "failed %" }, "properties": [{ "id": "unit", "value": "percent" }, { "id": "custom.axisPlacement", "value": "right" }] }
+      ] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(k6_http_reqs_total[1m]))", "legendFormat": "reqs/s" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "100 * k6_http_req_failed_rate", "legendFormat": "failed %" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p95 per journey (ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 5, "showPoints": "never" } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"login\"}", "legendFormat": "login" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"invoice_lookup\"}", "legendFormat": "invoice_lookup" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"plan_change\"}", "legendFormat": "plan_change" },
+        { "refId": "D", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"payment\"}", "legendFormat": "payment" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Global latency p95 / p99 (ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 5, "showPoints": "never" } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k6_http_req_duration_p95)", "legendFormat": "p95" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k6_http_req_duration_p99)", "legendFormat": "p99" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+# Telco Reliability Lab — full local stack.
+#
+#   docker compose up -d --build         # boot API + data + observability
+#   docker compose run --rm k6 run /scripts/scenarios/smoke.js   # run a k6 profile
+#
+# Images track the latest stable tags (security policy: always pull newest).
+
+name: telco-reliability-lab
+
+services:
+  # ---------------------------------------------------------------- data layer
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: telco
+      POSTGRES_PASSWORD: telco
+      POSTGRES_DB: telco
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telco -d telco"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ----------------------------------------------------------- observability
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # collector self-metrics
+    depends_on:
+      - tempo
+
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo query API
+
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=6h"
+      # Accept k6's Prometheus remote-write output so the "k6 Test Run" dashboard
+      # can chart VUs / iterations / per-journey latency live.
+      - "--web.enable-remote-write-receiver"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_FEATURE_TOGGLES_ENABLE: traceToMetrics
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+
+  # ----------------------------------------------------------- system under test
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      NODE_ENV: production
+      HTTP_PORT: "3000"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: telco
+      PGPASSWORD: telco
+      PGDATABASE: telco
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: lab-only-secret-change-me
+      DEPLOYMENT_ENVIRONMENT: local
+      FAULT_INJECTION_ENABLED: "true"
+      LOG_PRETTY: "false"
+      LOKI_ENABLED: "true"
+      LOKI_URL: http://loki:3100
+      # OpenTelemetry auto-instrumentation (preloaded via NODE_OPTIONS in the image).
+      OTEL_SERVICE_NAME: telco-api
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.version=1.0.0,deployment.environment=local
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
+    healthcheck:
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://localhost:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  # ----------------------------------------------------------- demo web UI
+  # Static self-management portal served by nginx, which also reverse-proxies
+  # /api/* to the API (so the browser stays same-origin — no CORS needed).
+  web:
+    build:
+      context: ./apps/web
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ----------------------------------------------------------- load generator
+  # Not started by `up`. Run on demand:
+  #   docker compose run --rm k6 run /scripts/scenarios/smoke.js
+  k6:
+    image: grafana/k6:latest
+    profiles: ["testing"]
+    environment:
+      BASE_URL: http://api:3000
+      K6_WEB_DASHBOARD: "false"
+      # Used only when a run is started with `-o experimental-prometheus-remote-write`
+      # (see the load/stress/spike/soak/degradation make targets). Harmless otherwise.
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_STATS: "p(95),p(99),avg,med,max"
+      K6_PROMETHEUS_RW_STALE_MARKERS: "true"
+    volumes:
+      # Read-write so k6 can write --summary-export reports into tests/k6/reports.
+      - ./tests/k6:/scripts
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  tempo-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:

@@ -1,0 +1,97 @@
+{
+  "uid": "telco-slo-overview",
+  "title": "Telco — SLO Overview",
+  "tags": ["telco", "slo"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Login p95 (SLO < 600ms)",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 600 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/auth/login\"}[5m])))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Invoice lookup p95 (SLO < 800ms)",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 800 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/customers/:customerId/invoices\"}[5m])))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Plan change p95 (SLO < 1200ms)",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1200 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/customers/:customerId/plan-changes\"}[5m])))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Payment p95 (SLO < 1500ms)",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1500 }] } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/payments\"}[5m])))" }]
+    },
+    {
+      "type": "gauge",
+      "title": "Error rate (SLO < 1%)",
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 5, "decimals": 2,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 2 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdMarkers": true },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "100 * sum(rate(http_request_errors_total{service=\"telco-api\"}[5m])) / clamp_min(sum(rate(http_requests_total{service=\"telco-api\"}[5m])), 1)" }]
+    },
+    {
+      "type": "gauge",
+      "title": "Synthetic availability (SLO ≥ 99%)",
+      "gridPos": { "h": 7, "w": 6, "x": 6, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 90, "max": 100, "decimals": 2,
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 99 }, { "color": "green", "value": 99.5 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdMarkers": true },
+      "targets": [{ "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "expr": "100 * sum(rate(http_requests_total{service=\"telco-api\",status!~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total{service=\"telco-api\"}[5m])), 1)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 per journey over time",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 5, "showPoints": "never" } }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "login",
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/auth/login\"}[5m])))" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "invoice_lookup",
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/customers/:customerId/invoices\"}[5m])))" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "plan_change",
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/customers/:customerId/plan-changes\"}[5m])))" },
+        { "refId": "D", "datasource": { "type": "prometheus", "uid": "prometheus" }, "legendFormat": "payment",
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"telco-api\",route=\"/payments\"}[5m])))" }
+      ]
+    }
+  ]
+}

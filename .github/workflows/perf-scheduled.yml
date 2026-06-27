@@ -1,0 +1,77 @@
+name: Scheduled Performance
+
+# Diagnostic profiles (stress / spike / soak) are NON-GATING: they explore limits
+# and publish reports, so threshold breaches must not fail the workflow. They run
+# nightly and on demand — never on a PR.
+on:
+  schedule:
+    - cron: "0 3 * * *" # nightly at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Which profile(s) to run
+        type: choice
+        default: stress+spike
+        options:
+          - stress+spike
+          - stress
+          - spike
+          - soak
+
+jobs:
+  performance:
+    name: Diagnostic load profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Boot the stack
+        run: docker compose up -d --build
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3000/health >/dev/null 2>&1 && { echo "healthy"; exit 0; }
+            sleep 2
+          done
+          echo "API did not become healthy"; docker compose ps; exit 1
+
+      - name: Stress
+        if: ${{ github.event_name == 'schedule' || contains(github.event.inputs.profile, 'stress') }}
+        continue-on-error: true
+        run: |
+          docker compose run --rm -T k6 run -o experimental-prometheus-remote-write \
+            --summary-export /scripts/reports/stress-summary.json /scripts/scenarios/stress.js
+
+      - name: Spike
+        if: ${{ github.event_name == 'schedule' || contains(github.event.inputs.profile, 'spike') }}
+        continue-on-error: true
+        run: |
+          docker compose run --rm -T k6 run -o experimental-prometheus-remote-write \
+            --summary-export /scripts/reports/spike-summary.json /scripts/scenarios/spike.js
+
+      - name: Soak
+        if: ${{ github.event.inputs.profile == 'soak' }}
+        continue-on-error: true
+        run: |
+          docker compose run --rm -T k6 run -o experimental-prometheus-remote-write \
+            --summary-export /scripts/reports/soak-summary.json /scripts/scenarios/soak.js
+
+      - name: Collect container logs
+        if: always()
+        run: docker compose logs --no-color > perf-stack-logs.txt 2>&1 || true
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-performance-reports
+          path: |
+            tests/k6/reports/
+            perf-stack-logs.txt
+          if-no-files-found: warn
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
