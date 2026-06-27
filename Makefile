@@ -35,7 +35,7 @@ test: ## Run API unit tests
 	cd apps/api && npm test
 
 # RW = also stream live metrics to Prometheus so the "k6 Test Run" dashboard fills in.
-RW := -o experimental-prometheus-remote-write
+RW := -o experimental-prometheus-rw
 
 smoke: ## Run the k6 smoke profile (quality gate; no remote-write)
 	$(COMPOSE) run --rm k6 run --summary-export /scripts/reports/smoke-summary.json /scripts/scenarios/smoke.js

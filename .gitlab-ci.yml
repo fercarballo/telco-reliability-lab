@@ -110,9 +110,9 @@ performance:diagnostic:
         curl -fsS http://docker:3000/health >/dev/null 2>&1 && break
         sleep 2
       done
-    - docker compose run --rm -T k6 run -o experimental-prometheus-remote-write
+    - docker compose run --rm -T k6 run -o experimental-prometheus-rw
         --summary-export /scripts/reports/stress-summary.json /scripts/scenarios/stress.js || true
-    - docker compose run --rm -T k6 run -o experimental-prometheus-remote-write
+    - docker compose run --rm -T k6 run -o experimental-prometheus-rw
         --summary-export /scripts/reports/spike-summary.json /scripts/scenarios/spike.js || true
   after_script:
     - docker compose down -v || true

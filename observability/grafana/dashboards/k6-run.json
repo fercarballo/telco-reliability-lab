@@ -14,7 +14,7 @@
       "type": "text",
       "title": "",
       "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
-      "options": { "mode": "markdown", "content": "These panels read **k6 Prometheus remote-write** metrics (`k6_*`). Populate them by running a profile with remote-write enabled, e.g. `make load` / `make degradation` (which add `-o experimental-prometheus-remote-write`). The plain `make smoke` gate does not push to Prometheus." }
+      "options": { "mode": "markdown", "content": "These panels read **k6 Prometheus remote-write** metrics (`k6_*`). Populate them by running a profile with remote-write enabled, e.g. `make load` / `make degradation` (which add `-o experimental-prometheus-rw`). The plain `make smoke` gate does not push to Prometheus." }
     },
     {
       "type": "stat",
@@ -84,10 +84,10 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "ms", "custom": { "fillOpacity": 5, "showPoints": "never" } }, "overrides": [] },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"login\"}", "legendFormat": "login" },
-        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"invoice_lookup\"}", "legendFormat": "invoice_lookup" },
-        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"plan_change\"}", "legendFormat": "plan_change" },
-        { "refId": "D", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "k6_http_req_duration_p95{journey=\"payment\"}", "legendFormat": "payment" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k6_http_req_duration_p95{journey=\"login\"})", "legendFormat": "login" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k6_http_req_duration_p95{journey=\"invoice_lookup\"})", "legendFormat": "invoice_lookup" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k6_http_req_duration_p95{journey=\"plan_change\"})", "legendFormat": "plan_change" },
+        { "refId": "D", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "max(k6_http_req_duration_p95{journey=\"payment\"})", "legendFormat": "payment" }
       ]
     },
     {

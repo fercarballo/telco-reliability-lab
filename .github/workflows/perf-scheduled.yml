@@ -41,21 +41,21 @@ jobs:
         if: ${{ github.event_name == 'schedule' || contains(github.event.inputs.profile, 'stress') }}
         continue-on-error: true
         run: |
-          docker compose run --rm -T k6 run -o experimental-prometheus-remote-write \
+          docker compose run --rm -T k6 run -o experimental-prometheus-rw \
             --summary-export /scripts/reports/stress-summary.json /scripts/scenarios/stress.js
 
       - name: Spike
         if: ${{ github.event_name == 'schedule' || contains(github.event.inputs.profile, 'spike') }}
         continue-on-error: true
         run: |
-          docker compose run --rm -T k6 run -o experimental-prometheus-remote-write \
+          docker compose run --rm -T k6 run -o experimental-prometheus-rw \
             --summary-export /scripts/reports/spike-summary.json /scripts/scenarios/spike.js
 
       - name: Soak
         if: ${{ github.event.inputs.profile == 'soak' }}
         continue-on-error: true
         run: |
-          docker compose run --rm -T k6 run -o experimental-prometheus-remote-write \
+          docker compose run --rm -T k6 run -o experimental-prometheus-rw \
             --summary-export /scripts/reports/soak-summary.json /scripts/scenarios/soak.js
 
       - name: Collect container logs

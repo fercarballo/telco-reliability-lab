@@ -172,7 +172,7 @@ services:
     environment:
       BASE_URL: http://api:3000
       K6_WEB_DASHBOARD: "false"
-      # Used only when a run is started with `-o experimental-prometheus-remote-write`
+      # Used only when a run is started with `-o experimental-prometheus-rw`
       # (see the load/stress/spike/soak/degradation make targets). Harmless otherwise.
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_STATS: "p(95),p(99),avg,med,max"
