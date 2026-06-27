@@ -1,196 +1,209 @@
 # Telco Reliability Lab
 
-**A performance & reliability engineering portfolio (SDET / Quality Engineering).**
-A realistic telco self-management API, instrumented end-to-end, with a k6
-performance suite, a full Grafana observability stack, controlled fault
-injection, and CI quality gates that can block a release on reliability.
+**Portfolio de ingeniería de rendimiento y fiabilidad (SDET / Quality Engineering).**
+Una API de autogestión telco realista, instrumentada de extremo a extremo, con una
+suite de pruebas de rendimiento k6, un stack de observabilidad Grafana completo,
+inyección de fallos controlada y quality gates de CI capaces de bloquear un despliegue
+por criterios de fiabilidad.
 
-> The deliverable isn't load — it's **decisions**: defendable SLOs, the right
-> test for each risk, and observability good enough to debug under pressure.
+> El entregable no es la carga — son las **decisiones**: SLOs defendibles, la prueba
+> correcta para cada riesgo y la observabilidad suficiente para depurar bajo presión.
 
 ---
 
-## What's in the box
+## Qué incluye
 
-- **System under test** — Fastify + TypeScript API with the four highest-risk
-  telco journeys: login, invoice lookup, plan change, and **payment with
-  database-enforced idempotency**.
-- **Performance suite** — k6 profiles: smoke, load, stress, spike, soak, and a
-  self-contained **degradation** drill. Per-journey SLO thresholds.
-- **Observability** — RED + business metrics (Prometheus), distributed traces
-  (OpenTelemetry → Collector → Tempo), structured logs with `trace_id` (Loki),
-  and Grafana wired for metric → trace → log correlation.
-- **Fault injection** — inject latency / errors / timeouts at runtime to drive
-  the degradation demo (env-gated; lab only).
-- **Functional tests** — Playwright API integration tests covering auth guards, schema validation, invoice access control, and the **payment idempotency invariant** (same `Idempotency-Key` must never produce a second charge).
-- **Alerting** — Prometheus alert rules for each SLO (per-journey p95 + error rate + API down); Alertmanager routes webhook → `POST /admin/alerts` on the API itself, so firing alerts appear in Loki alongside traces — no external dependencies needed.
-- **OpenAPI 3.1 spec** — `docs/openapi.yaml` documents every endpoint with request/response schemas; linted with Redocly in CI as a quality gate.
-- **CI/CD** — GitHub Actions and GitLab CI: typecheck + unit tests + OpenAPI lint + Playwright API tests + k6 smoke as quality gates; scheduled stress/spike/soak with run-to-run regression comparison and OWASP ZAP passive scan.
+- **Sistema bajo prueba** — API Fastify + TypeScript con los cuatro flujos de mayor riesgo
+  en telco: login, consulta de facturas, cambio de plan y **pago con idempotencia
+  aplicada a nivel de base de datos**.
+- **Suite de rendimiento** — Perfiles k6: smoke, load, stress, spike, soak y un
+  ejercicio de **degradación** autocontenido. Umbrales SLO por journey.
+- **Observabilidad** — Métricas RED + negocio (Prometheus), trazas distribuidas
+  (OpenTelemetry → Collector → Tempo), logs estructurados con `trace_id` (Loki) y
+  Grafana configurado para correlación métrica → traza → log.
+- **Inyección de fallos** — Inyecta latencia / errores / timeouts en tiempo de ejecución
+  para impulsar la demo de degradación (gated por env; sólo para laboratorio).
+- **Pruebas funcionales** — Tests de integración API con Playwright que cubren guards de
+  autenticación, validación de esquema, control de acceso a facturas y el **invariante
+  de idempotencia de pagos** (la misma `Idempotency-Key` nunca debe generar un segundo
+  cargo).
+- **Alertas** — Reglas de alerta Prometheus para cada SLO (p95 por journey + tasa de
+  error + API caída); Alertmanager enruta webhook → `POST /admin/alerts` en la propia
+  API, de modo que las alertas activas aparecen en Loki junto a las trazas — sin
+  dependencias externas.
+- **Especificación OpenAPI 3.1** — `docs/openapi.yaml` documenta cada endpoint con
+  esquemas de petición y respuesta; validado con Redocly en CI como quality gate.
+- **CI/CD** — GitHub Actions y GitLab CI: typecheck + pruebas unitarias + lint OpenAPI +
+  tests Playwright + k6 smoke como quality gates; stress/spike/soak programados con
+  comparación regresión entre ejecuciones y escaneo pasivo OWASP ZAP.
 
-## Architecture
+## Arquitectura
 
 ```mermaid
 flowchart LR
-    User["Synthetic Users (k6)"] --> API["Telco API (Fastify/TS)"]
+    User["Usuarios sintéticos (k6)"] --> API["Telco API (Fastify/TS)"]
     API --> DB["PostgreSQL"]
     API --> Redis["Redis"]
     API -- OTLP traces --> OTel["OTel Collector"] --> Tempo["Tempo"]
     API -- /metrics scrape --> Prom["Prometheus"]
-    API -- structured logs --> Loki["Loki"]
+    API -- logs estructurados --> Loki["Loki"]
     Prom --> Grafana["Grafana"]
     Tempo --> Grafana
     Loki --> Grafana
 ```
 
-Details and design trade-offs: [`docs/architecture.md`](docs/architecture.md).
+Detalles y decisiones de diseño: [`docs/architecture.md`](docs/architecture.md).
 
-## Quickstart
+## Inicio rápido
 
-Requires Docker + Docker Compose.
+Requiere Docker + Docker Compose.
 
 ```bash
-# 1. Boot the whole stack (API + Postgres + Redis + OTel + Tempo + Loki + Prometheus + Grafana)
+# 1. Levantar todo el stack (API + Postgres + Redis + OTel + Tempo + Loki + Prometheus + Grafana)
 docker compose up -d --build
 
-# 2. Smoke-test the system (gates on SLO thresholds)
+# 2. Smoke-test del sistema (bloqueante si se incumplen umbrales SLO)
 docker compose run --rm k6 run /scripts/scenarios/smoke.js
 
-# 3. Explore
-#    Web UI     http://localhost:8080   (demo self-management portal)
+# 3. Explorar
+#    Web UI     http://localhost:8080   (portal de autogestión demo)
 #    API        http://localhost:3000/health
-#    Metrics    http://localhost:3000/metrics
-#    Grafana    http://localhost:3001   (anonymous viewer; admin/admin to edit)
+#    Métricas   http://localhost:3000/metrics
+#    Grafana    http://localhost:3001   (visor anónimo; admin/admin para editar)
 #    Prometheus http://localhost:9090
 ```
 
-Grafana ships four provisioned dashboards (folder **Telco Reliability Lab**):
-**API — RED**, **SLO Overview**, **k6 Test Run**, and **Reliability & Degradation**.
+Grafana incluye cuatro dashboards aprovisionados (carpeta **Telco Reliability Lab**):
+**API — RED**, **SLO Overview**, **k6 Test Run** y **Reliability & Degradation**.
 
-### Verify the whole stack in one command
+### Verificar todo el stack en un solo comando
 
 ```bash
-./scripts/verify-stack.sh --up    # boots, then checks every component + runs k6 smoke
+./scripts/verify-stack.sh --up    # levanta y verifica cada componente + ejecuta k6 smoke
 ```
 
-It validates API/DB/Redis health, that Prometheus is scraping the API, Tempo/Loki
-readiness, Grafana provisioning, and that the smoke profile passes its SLOs —
-exiting non-zero if anything is wrong.
+Valida salud de API/DB/Redis, que Prometheus está scrapeando la API, disponibilidad de
+Tempo/Loki, aprovisionamiento de Grafana y que el perfil smoke supera sus SLOs —
+sale con error si algo falla.
 
-### Run the other profiles
+### Ejecutar los otros perfiles
 
 ```bash
 docker compose run --rm k6 run /scripts/scenarios/load.js
 docker compose run --rm k6 run /scripts/scenarios/stress.js
 docker compose run --rm k6 run /scripts/scenarios/spike.js
-docker compose run --rm k6 run /scripts/scenarios/degradation.js   # injects + clears a fault
+docker compose run --rm k6 run /scripts/scenarios/degradation.js   # inyecta y limpia un fallo
 ```
 
-### The 3-click incident demo
+### La demo de incidente en 3 clics
 
-Run `degradation.js`, then follow
-[`docs/observability-guide.md`](docs/observability-guide.md): Grafana shows
-payment p95 breaching budget → open a slow trace in Tempo → the time is in
-`payment-gateway-simulator` → click through to the correlated Loki logs by
-`trace_id`. Metric → trace → log, in three clicks.
+Ejecuta `degradation.js` y sigue
+[`docs/observability-guide.md`](docs/observability-guide.md): Grafana muestra el p95
+de pagos rompiendo el presupuesto → abre una traza lenta en Tempo → el tiempo está en
+`payment-gateway-simulator` → haz clic en los logs Loki correlacionados por `trace_id`.
+Métrica → traza → log, en tres clics.
 
 ## Endpoints
 
-| Method | Path | Notes |
+| Método | Ruta | Notas |
 |---|---|---|
-| POST | `/auth/login` | Returns a JWT + `customerId` |
-| GET | `/customers/:customerId/invoices` | Auth required; own data only |
-| POST | `/customers/:customerId/plan-changes` | Auth required; returns `202 scheduled` |
-| POST | `/payments` | Auth + `Idempotency-Key` header; DB-enforced idempotency |
-| GET | `/health` · `/health/live` | Readiness (deps) · liveness |
-| GET | `/metrics` | Prometheus exposition |
-| POST/GET/DELETE | `/admin/faults` | Fault injection (env-gated) |
-| POST | `/admin/alerts` | Alertmanager webhook receiver — logs firing alerts to Loki |
+| POST | `/auth/login` | Devuelve un JWT + `customerId` |
+| GET | `/customers/:customerId/invoices` | Requiere auth; sólo datos propios |
+| POST | `/customers/:customerId/plan-changes` | Requiere auth; devuelve `202 scheduled` |
+| POST | `/payments` | Auth + cabecera `Idempotency-Key`; idempotencia aplicada en DB |
+| GET | `/health` · `/health/live` | Disponibilidad (dependencias) · Liveness |
+| GET | `/metrics` | Exposición Prometheus |
+| POST/GET/DELETE | `/admin/faults` | Inyección de fallos (gated por env) |
+| POST | `/admin/alerts` | Receptor webhook de Alertmanager — registra alertas activas en Loki |
 
-Full contract: [`docs/openapi.yaml`](docs/openapi.yaml) (OAS 3.1, validated with Redocly).
+Contrato completo: [`docs/openapi.yaml`](docs/openapi.yaml) (OAS 3.1, validado con Redocly).
 
-## SLOs (gated by k6 thresholds)
+## SLOs (aplicados por umbrales k6)
 
-| Journey | p95 target | Error rate |
+| Journey | Objetivo p95 | Tasa de error |
 |---|---:|---:|
 | Login | < 600 ms | < 1% |
-| Invoice lookup | < 800 ms | < 1% |
-| Plan change | < 1200 ms | < 1.5% |
-| Payment | < 1500 ms | < 1% |
+| Consulta de facturas | < 800 ms | < 1% |
+| Cambio de plan | < 1200 ms | < 1,5% |
+| Pago | < 1500 ms | < 1% |
 | **Global** | **< 1200 ms** | **< 1%**, checks **> 99%** |
 
-Rationale: [`docs/slo-definition.md`](docs/slo-definition.md).
+Justificación: [`docs/slo-definition.md`](docs/slo-definition.md).
 
-## API integration tests (Playwright)
+## Tests de integración API (Playwright)
 
-The `tests/api/` suite uses Playwright's `APIRequestContext` — no browser, pure HTTP. It runs against the live stack and validates:
+La suite `tests/api/` usa `APIRequestContext` de Playwright — sin navegador, HTTP puro.
+Se ejecuta contra el stack en vivo y valida:
 
-| File | What it covers |
+| Fichero | Qué cubre |
 |---|---|
-| `health.spec.ts` | `/health/live` liveness, `/health` readiness (DB + Redis deps) |
-| `auth.spec.ts` | Login happy path, wrong password → 401, schema validation → 400, no user enumeration |
-| `invoices.spec.ts` | Authenticated list, no token → 401, cross-customer → 403 |
-| `plan-changes.spec.ts` | Schedule → 202, same plan → 422, cross-customer → 403 |
-| `payments.spec.ts` | Missing `Idempotency-Key` → 400, cross-customer → 403, **idempotent replay → same `paymentId`** |
+| `health.spec.ts` | Liveness `/health/live`, readiness `/health` (dependencias DB + Redis) |
+| `auth.spec.ts` | Login correcto, contraseña incorrecta → 401, validación de esquema → 400, sin enumeración de usuarios |
+| `invoices.spec.ts` | Lista autenticada, sin token → 401, acceso entre clientes → 403 |
+| `plan-changes.spec.ts` | Programar → 202, mismo plan → 422, acceso entre clientes → 403 |
+| `payments.spec.ts` | `Idempotency-Key` ausente → 400, acceso entre clientes → 403, **replay idempotente → mismo `paymentId`** |
 
 ```bash
-make up          # boot the stack
-make api-test    # run all Playwright API tests
-make api-test-report  # open the HTML report
+make up          # levantar el stack
+make api-test    # ejecutar todos los tests Playwright API
+make api-test-report  # abrir el informe HTML
 ```
 
-The idempotency test (⭐ in test output) is the most critical: it proves a network retry cannot double-charge a customer by verifying that two identical `POST /payments` calls with the same key return the same `paymentId`.
+El test de idempotencia (⭐ en la salida) es el más crítico: demuestra que un reintento
+de red no puede cobrar dos veces a un cliente verificando que dos llamadas `POST /payments`
+idénticas con la misma clave devuelven el mismo `paymentId`.
 
-## Local development (API without Docker)
+## Desarrollo local (API sin Docker)
 
 ```bash
 cd apps/api
 npm install
-npm run typecheck && npm test        # static check + unit tests
-npm run dev                          # needs local Postgres + Redis (see .env.example)
+npm run typecheck && npm test        # comprobación estática + tests unitarios
+npm run dev                          # requiere Postgres + Redis locales (ver .env.example)
 ```
 
-Regenerate seed data: `node infra/postgres/generate-seed.mjs`.
+Regenerar datos de prueba: `node infra/postgres/generate-seed.mjs`.
 
-## Project layout
+## Estructura del proyecto
 
 ```
-apps/api/              Fastify TypeScript API (system under test) + unit tests (Vitest)
-apps/web/              Demo self-management UI (static SPA, nginx reverse-proxies /api)
-tests/api/             Playwright API integration tests (no browser — pure HTTP)
-tests/k6/              Performance suite: scenarios, profiles, thresholds, helpers
-tests/zap/             OWASP ZAP passive scan reports (generated; gitignored)
+apps/api/              API Fastify TypeScript (sistema bajo prueba) + tests unitarios (Vitest)
+apps/web/              UI demo de autogestión (SPA estática, nginx hace reverse-proxy de /api)
+tests/api/             Tests de integración API con Playwright (sin navegador — HTTP puro)
+tests/k6/              Suite de rendimiento: escenarios, perfiles, umbrales, helpers
+tests/zap/             Informes de escaneo pasivo OWASP ZAP (generados; en .gitignore)
 observability/
-  prometheus/          prometheus.yml + alert-rules.yml (SLO breach rules)
-  alertmanager/        alertmanager.yml (webhook → API /admin/alerts)
-  grafana/             4 dashboards as code (RED, k6 run, SLO overview, reliability)
-  otel-collector/      OTel Collector config
-  tempo/ loki/         Trace + log backends
-infra/postgres/        Schema + deterministic synthetic seed
+  prometheus/          prometheus.yml + alert-rules.yml (reglas de incumplimiento SLO)
+  alertmanager/        alertmanager.yml (webhook → /admin/alerts en la API)
+  grafana/             4 dashboards como código (RED, k6 run, SLO overview, fiabilidad)
+  otel-collector/      Configuración del OTel Collector
+  tempo/ loki/         Backends de trazas y logs
+infra/postgres/        Esquema + semilla sintética determinista
 scripts/               verify-stack.sh, compare-runs.js, zap-smoke.sh, generate-report.js
-docs/                  openapi.yaml (OAS 3.1), architecture, SLOs, strategy, runbook, interview
-.github/ · .gitlab-ci  CI: build + spec-lint + Playwright + k6 smoke gates; scheduled diagnostic + ZAP
-docker-compose.yml     One-command reproducible environment (includes Alertmanager)
-playwright.config.ts   Playwright config (API tests, no browser)
+docs/                  openapi.yaml (OAS 3.1), arquitectura, SLOs, estrategia, runbook, entrevista
+.github/ · .gitlab-ci  CI: build + spec-lint + Playwright + k6 smoke gates; diagnósticos programados + ZAP
+docker-compose.yml     Entorno reproducible en un comando (incluye Alertmanager)
+playwright.config.ts   Configuración Playwright (tests API, sin navegador)
 ```
 
-## Documentation
+## Documentación
 
-- [Executive overview](docs/executive-overview.md) ← start here for non-technical audiences
-- [Architecture & decisions](docs/architecture.md)
-- [SLOs, SLIs & thresholds](docs/slo-definition.md)
-- [Performance testing strategy](docs/performance-strategy.md)
-- [Reliability testing (idempotency & faults)](docs/reliability-testing.md)
-- [Observability guide (metric → trace → log)](docs/observability-guide.md)
-- [Database schema](docs/database-schema.md)
-- [API error catalog](docs/error-codes.md)
-- [Interview walkthrough](docs/interview-walkthrough.md)
+- [Resumen ejecutivo](docs/executive-overview.md) ← empezar aquí para audiencias no técnicas
+- [Arquitectura y decisiones](docs/architecture.md)
+- [SLOs, SLIs y umbrales](docs/slo-definition.md)
+- [Estrategia de pruebas de rendimiento](docs/performance-strategy.md)
+- [Pruebas de fiabilidad (idempotencia y fallos)](docs/reliability-testing.md)
+- [Guía de observabilidad (métrica → traza → log)](docs/observability-guide.md)
+- [Esquema de base de datos](docs/database-schema.md)
+- [Catálogo de errores API](docs/error-codes.md)
+- [Guión de entrevista técnica](docs/interview-walkthrough.md)
 
-## Roadmap
+## Hoja de ruta
 
-k6 on Kubernetes (k6-operator), ArgoCD/GitOps, Alertmanager → PagerDuty/Slack
-webhook in a real staging environment.
+k6 en Kubernetes (k6-operator), ArgoCD/GitOps, Alertmanager → webhook real de
+PagerDuty/Slack en un entorno de staging.
 
-## Disclaimer
+## Aviso
 
-Portfolio project. All data is **synthetic**; no real credentials. Fault
-injection and the demo JWT secret are for local/CI use only.
+Proyecto de portfolio. Todos los datos son **sintéticos**; sin credenciales reales.
+La inyección de fallos y el secreto JWT de demo son exclusivamente para uso local y en CI.
