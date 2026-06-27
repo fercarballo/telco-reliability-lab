@@ -8,6 +8,8 @@ import { config } from '../config';
 import { maybeInjectFault } from '../faults';
 import { withSpan } from '../tracing';
 import { businessPaymentsTotal, paymentIdempotencyConflicts } from '../metrics';
+import { forbidIfNotOwner } from '../lib/route-utils';
+import { PaymentCache } from '../lib/constants';
 
 interface PaymentBody {
   customerId: string;
@@ -35,9 +37,6 @@ const schema = {
     },
   },
 } as const;
-
-const IDEM_CACHE_PREFIX = 'idem:payment:';
-const IDEM_CACHE_TTL_SEC = 24 * 3600;
 
 /**
  * Simulated external payment gateway. The injected `payments` fault is applied
@@ -74,12 +73,10 @@ export default async function paymentRoutes(app: FastifyInstance) {
 
       const { customerId, invoiceId, amount, method } = request.body;
 
-      if (request.authCustomerId !== customerId) {
-        return reply.code(403).send({ error: 'forbidden', message: 'Cannot pay for another customer' });
-      }
+      if (await forbidIfNotOwner(request, reply, customerId)) return;
 
       // Fast replay path: a previously completed payment for this key.
-      const cached = await redis.get(`${IDEM_CACHE_PREFIX}${idempotencyKey}`);
+      const cached = await redis.get(`${PaymentCache.PREFIX}${idempotencyKey}`);
       if (cached) {
         paymentIdempotencyConflicts.inc();
         businessPaymentsTotal.inc({ status: 'idempotent_replay' });
@@ -146,10 +143,10 @@ export default async function paymentRoutes(app: FastifyInstance) {
 
       // Cache the settled result for fast future replays.
       await redis.set(
-        `${IDEM_CACHE_PREFIX}${idempotencyKey}`,
+        `${PaymentCache.PREFIX}${idempotencyKey}`,
         JSON.stringify(outcome.result),
         'EX',
-        IDEM_CACHE_TTL_SEC,
+        PaymentCache.TTL_SEC,
       );
 
       businessPaymentsTotal.inc({ status: outcome.result.status });

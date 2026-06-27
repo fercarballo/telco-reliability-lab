@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { BASE_URL } from './config.js';
+import { BASE_URL, JSON_HEADERS, JOURNEY } from './config.js';
 import { pickUser } from '../data/users.js';
 import {
   loginDuration,
@@ -14,8 +14,6 @@ import {
   paymentIdempotencyConflicts,
 } from './metrics.js';
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
-
 // Each request is tagged with `journey:<name>` so the thresholds file can assert
 // http_req_duration{journey:payment} etc. independently per business flow.
 
@@ -23,7 +21,7 @@ export function login(user) {
   const res = http.post(
     `${BASE_URL}/auth/login`,
     JSON.stringify({ username: user.username, password: user.password }),
-    { headers: JSON_HEADERS, tags: { journey: 'login' } },
+    { headers: JSON_HEADERS, tags: { journey: JOURNEY.LOGIN } },
   );
   const ok = check(res, {
     'login: status 200': (r) => r.status === 200,
@@ -38,7 +36,7 @@ export function login(user) {
 export function listInvoices(token, customerId) {
   const res = http.get(`${BASE_URL}/customers/${customerId}/invoices`, {
     headers: { Authorization: `Bearer ${token}` },
-    tags: { journey: 'invoice_lookup' },
+    tags: { journey: JOURNEY.INVOICE_LOOKUP },
   });
   const ok = check(res, {
     'invoices: status 200': (r) => r.status === 200,
@@ -53,7 +51,7 @@ export function changePlan(token, customerId, targetPlanId) {
   const res = http.post(
     `${BASE_URL}/customers/${customerId}/plan-changes`,
     JSON.stringify({ targetPlanId }),
-    { headers: { ...JSON_HEADERS, Authorization: `Bearer ${token}` }, tags: { journey: 'plan_change' } },
+    { headers: { ...JSON_HEADERS, Authorization: `Bearer ${token}` }, tags: { journey: JOURNEY.PLAN_CHANGE } },
   );
   const ok = check(res, {
     'plan change: status 202': (r) => r.status === 202,
@@ -75,7 +73,7 @@ export function payInvoice(token, customerId, invoice) {
     method: 'credit_card',
   });
 
-  const res = http.post(`${BASE_URL}/payments`, body, { headers, tags: { journey: 'payment' } });
+  const res = http.post(`${BASE_URL}/payments`, body, { headers, tags: { journey: JOURNEY.PAYMENT } });
   const ok = check(res, {
     'payment: status 200/201': (r) => r.status === 200 || r.status === 201,
     'payment: paymentId present': (r) => !!r.json('paymentId'),
@@ -86,7 +84,7 @@ export function payInvoice(token, customerId, invoice) {
 
   // Idempotency assertion: replay the SAME key, expect the SAME payment back, no duplicate.
   if (ok) {
-    const replay = http.post(`${BASE_URL}/payments`, body, { headers, tags: { journey: 'payment' } });
+    const replay = http.post(`${BASE_URL}/payments`, body, { headers, tags: { journey: JOURNEY.PAYMENT } });
     const idempotent = check(replay, {
       'payment replay: status 200': (r) => r.status === 200,
       'payment replay: same paymentId': (r) => r.json('paymentId') === res.json('paymentId'),

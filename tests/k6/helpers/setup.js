@@ -2,9 +2,7 @@
 // setup() in k6 runs once before VUs start, in a single goroutine — safe for
 // admin operations that must complete before load begins.
 import http from 'k6/http';
-import { BASE_URL } from './config.js';
-
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
+import { BASE_URL, JSON_HEADERS } from './config.js';
 
 // Reset all invoices to 'pending' before the run so the payment journey is
 // always exercised. Without this, invoices drain to 'paid' across repeated runs

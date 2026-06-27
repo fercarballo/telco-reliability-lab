@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../db';
 import { maybeInjectFault } from '../faults';
 import { withSpan } from '../tracing';
+import { forbidIfNotOwner } from '../lib/route-utils';
 
 interface InvoiceParams {
   customerId: string;
@@ -24,10 +25,7 @@ export default async function invoiceRoutes(app: FastifyInstance) {
 
       const { customerId } = request.params;
 
-      // Authorization: a customer may only read their own invoices.
-      if (request.authCustomerId !== customerId) {
-        return reply.code(403).send({ error: 'forbidden', message: 'Cannot access another customer' });
-      }
+      if (await forbidIfNotOwner(request, reply, customerId)) return;
 
       const invoices = await withSpan(
         'billing.list-invoices',

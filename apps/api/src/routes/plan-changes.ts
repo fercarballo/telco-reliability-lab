@@ -4,6 +4,7 @@ import { pool } from '../db';
 import { maybeInjectFault } from '../faults';
 import { withSpan } from '../tracing';
 import { businessPlanChangesTotal } from '../metrics';
+import { forbidIfNotOwner } from '../lib/route-utils';
 
 interface PlanChangeParams {
   customerId: string;
@@ -52,9 +53,7 @@ export default async function planChangeRoutes(app: FastifyInstance) {
       const { customerId } = request.params;
       const { targetPlanId } = request.body;
 
-      if (request.authCustomerId !== customerId) {
-        return reply.code(403).send({ error: 'forbidden', message: 'Cannot change another customer plan' });
-      }
+      if (await forbidIfNotOwner(request, reply, customerId)) return;
 
       const customer = await withSpan('plans.load-customer', { 'customer.id': customerId }, async () => {
         const { rows } = await pool.query<{ current_plan_id: string | null }>(
