@@ -1,0 +1,72 @@
+# Render Blueprint — slim public demo of the Telco Reliability Lab.
+#
+# Deploys the *demonstrable-in-a-browser* subset: API + web UI + managed Postgres
+# + managed Redis. The observability stack (Prometheus/Grafana/Tempo/Loki) is NOT
+# deployed here — it is shown live locally or via docs/screenshots. See docs/DEPLOY.md.
+#
+# Usage: Render Dashboard → New → Blueprint → connect this repo. Render reads this
+# file and provisions everything. After the first deploy, fill the two `sync: false`
+# vars (CORS_ORIGINS, API_BASE) with the real service URLs and redeploy.
+
+databases:
+  - name: telco-db
+    plan: free            # free Postgres expires ~90 days; re-create to renew
+    databaseName: telco
+    user: telco
+
+services:
+  # Managed Redis (Render Key Value) — idempotency cache + sessions.
+  - type: redis
+    name: telco-redis
+    plan: free
+    ipAllowList: []       # internal only (no public access)
+
+  # System under test: the API. Build context is the repo root so the image
+  # bundles the init SQL; RUN_DB_MIGRATIONS bootstraps the schema + seed on boot.
+  - type: web
+    name: telco-api
+    runtime: docker
+    plan: free
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/live
+    envVars:
+      - key: DEPLOYMENT_ENVIRONMENT
+        value: production            # activates the demo-secret safety guard
+      - key: RUN_DB_MIGRATIONS
+        value: "true"                # managed PG has no initdb; seed on boot
+      - key: FAULT_INJECTION_ENABLED
+        value: "false"               # /admin/* stays locked in public
+      - key: HTTP_HOST
+        value: 0.0.0.0
+      - key: OTEL_SDK_DISABLED
+        value: "true"                # no collector in the slim deploy
+      - key: JWT_SECRET
+        generateValue: true          # strong unique secret, never in the repo
+      - key: PGHOST
+        fromDatabase: { name: telco-db, property: host }
+      - key: PGPORT
+        fromDatabase: { name: telco-db, property: port }
+      - key: PGUSER
+        fromDatabase: { name: telco-db, property: user }
+      - key: PGPASSWORD
+        fromDatabase: { name: telco-db, property: password }
+      - key: PGDATABASE
+        fromDatabase: { name: telco-db, property: database }
+      - key: REDIS_URL
+        fromService: { type: redis, name: telco-redis, property: connectionString }
+      # Set to the telco-web URL after first deploy, e.g. https://telco-web.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
+
+  # Demo self-management UI (nginx). Static SPA; env.js is generated from API_BASE.
+  - type: web
+    name: telco-web
+    runtime: docker
+    plan: free
+    dockerfilePath: apps/web/Dockerfile
+    dockerContext: apps/web
+    envVars:
+      # Set to the telco-api URL after first deploy, e.g. https://telco-api.onrender.com
+      - key: API_BASE
+        sync: false

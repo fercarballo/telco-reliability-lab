@@ -196,6 +196,7 @@ playwright.config.ts   Configuración Playwright (tests API, sin navegador)
 - [Guía de observabilidad (métrica → traza → log)](docs/observability-guide.md)
 - [Esquema de base de datos](docs/database-schema.md)
 - [Catálogo de errores API](docs/error-codes.md)
+- [Guía de deploy (demo público gratuito)](docs/DEPLOY.md)
 - [Guión de entrevista técnica](docs/interview-walkthrough.md)
 
 ## Hoja de ruta

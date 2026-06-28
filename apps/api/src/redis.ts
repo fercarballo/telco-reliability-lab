@@ -6,13 +6,12 @@ import { config } from './config';
  *  - caching the idempotent payment response for fast replay
  *  - storing issued session tokens (so we can demonstrate Redis spans)
  */
-export const redis = new Redis({
-  host: config.redis.host,
-  port: config.redis.port,
-  lazyConnect: false,
-  maxRetriesPerRequest: 2,
-  enableReadyCheck: true,
-});
+const redisOptions = { lazyConnect: false, maxRetriesPerRequest: 2, enableReadyCheck: true };
+
+// Prefer a full connection URL (managed providers); fall back to host/port (local).
+export const redis = config.redis.url
+  ? new Redis(config.redis.url, redisOptions)
+  : new Redis({ host: config.redis.host, port: config.redis.port, ...redisOptions });
 
 export async function pingRedis(): Promise<boolean> {
   try {

@@ -37,9 +37,15 @@ export const config = {
     password: process.env.PGPASSWORD ?? 'telco',
     database: process.env.PGDATABASE ?? 'telco',
     poolMax: num(process.env.PG_POOL_MAX, 10),
+    // Managed Postgres (Render/Fly external connections) requires TLS. Off locally.
+    ssl: bool(process.env.PGSSL, false),
   },
 
   redis: {
+    // A full connection URL (redis:// or rediss://) takes precedence — managed
+    // providers (Render Key Value, Upstash, Fly) hand out a URL with auth/TLS.
+    // Falls back to host/port for the local Docker stack.
+    url: process.env.REDIS_URL ?? '',
     host: process.env.REDIS_HOST ?? 'localhost',
     port: num(process.env.REDIS_PORT, 6379),
   },
