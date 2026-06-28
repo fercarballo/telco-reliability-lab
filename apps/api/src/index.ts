@@ -1,7 +1,8 @@
 import { buildServer } from './server';
-import { config } from './config';
+import { config, assertProductionSafety } from './config';
 import { pool } from './db';
 import { redis } from './redis';
+import { runMigrations } from './migrate';
 
 /**
  * Bootstrap. OpenTelemetry is initialised *before* this module runs, via
@@ -11,7 +12,16 @@ import { redis } from './redis';
  * imported here.
  */
 async function main() {
+  // Refuse to boot a production process with an insecure (demo) JWT secret.
+  assertProductionSafety();
+
   const app = await buildServer();
+
+  // Bootstrap the schema + seed on managed-Postgres hosts that skip initdb.
+  if (config.runDbMigrations) {
+    app.log.info({ dir: config.migrationsDir }, 'running database migrations');
+    await runMigrations(app.log);
+  }
 
   try {
     await app.listen({ host: config.http.host, port: config.http.port });

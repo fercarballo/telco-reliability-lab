@@ -1,7 +1,10 @@
 // Telco self-management demo UI. Vanilla JS, no build step.
 // All API calls go to /api/* which nginx reverse-proxies to the API (same-origin).
 
-const API = '/api';
+// API base is runtime-configurable via env.js (window.API_BASE). Local/same-origin
+// deploys leave it empty and fall back to '/api' (nginx reverse-proxies to the API).
+// A split cloud deploy sets it to the API's public origin, e.g. https://telco-api.example.com
+const API = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : '/api';
 const state = { token: null, customerId: null, lastPayment: null };
 
 const $ = (id) => document.getElementById(id);

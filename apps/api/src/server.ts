@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyError } from 'fastify';
+import fastifyCors from '@fastify/cors';
+import { config } from './config';
 import { buildLogger } from './logger';
 import {
   httpRequestDuration,
@@ -32,6 +34,16 @@ export async function buildServer() {
     requestIdLogLabel: 'request_id',
     ajv: { customOptions: { removeAdditional: 'all', coerceTypes: true } },
   });
+
+  // CORS only when explicitly configured (split cloud deploy). The local stack is
+  // same-origin via the nginx proxy, so this is a no-op there.
+  if (config.cors.origins.length > 0) {
+    await app.register(fastifyCors, {
+      origin: config.cors.origins,
+      methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+    });
+  }
 
   await app.register(authPlugin);
 

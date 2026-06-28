@@ -123,7 +123,8 @@ services:
   # ----------------------------------------------------------- system under test
   api:
     build:
-      context: ./apps/api
+      context: .
+      dockerfile: apps/api/Dockerfile
     environment:
       NODE_ENV: production
       HTTP_PORT: "3000"

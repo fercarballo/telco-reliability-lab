@@ -44,6 +44,18 @@ export const config = {
     port: num(process.env.REDIS_PORT, 6379),
   },
 
+  /**
+   * Allowed CORS origins (comma-separated). Empty by default: the local stack is
+   * same-origin (nginx proxies /api), so no CORS is needed. A split cloud deploy
+   * (SPA on one host, API on another) sets CORS_ORIGINS to the SPA's origin.
+   */
+  cors: {
+    origins: (process.env.CORS_ORIGINS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  },
+
   logging: {
     level: process.env.LOG_LEVEL ?? 'info',
     // When enabled, ship structured logs to Loki via the pino-loki transport.
@@ -54,10 +66,21 @@ export const config = {
 
   /**
    * Fault injection is a deliberately dangerous capability (it degrades the
-   * service on purpose), so it is gated behind an explicit flag that must only
-   * be enabled in local/CI environments.
+   * service on purpose), so it is gated behind an explicit flag. It defaults to
+   * **false** (safe): any public deployment that does not opt in stays locked.
+   * The local/CI Docker stack sets FAULT_INJECTION_ENABLED=true explicitly.
    */
-  faultInjectionEnabled: bool(process.env.FAULT_INJECTION_ENABLED, true),
+  faultInjectionEnabled: bool(process.env.FAULT_INJECTION_ENABLED, false),
+
+  /**
+   * Run schema + seed SQL on boot. Managed Postgres (Render, Fly, Railway) does
+   * not execute docker-entrypoint-initdb.d, so a cloud deploy needs the app to
+   * bootstrap its own database. The local Docker stack uses initdb and leaves
+   * this false. SQL lives in `migrationsDir` and is idempotent (IF NOT EXISTS /
+   * ON CONFLICT DO NOTHING), so re-running on every boot is safe.
+   */
+  runDbMigrations: bool(process.env.RUN_DB_MIGRATIONS, false),
+  migrationsDir: process.env.MIGRATIONS_DIR ?? 'db',
 
   /** Simulated downstream payment gateway behaviour. */
   paymentGateway: {
@@ -67,3 +90,29 @@ export const config = {
 } as const;
 
 export type AppConfig = typeof config;
+
+const INSECURE_JWT_SECRETS = new Set([
+  'dev-only-secret-do-not-use-in-prod',
+  'lab-only-secret-change-me',
+]);
+
+// Environments where the demo JWT secret is acceptable. A public deploy must set
+// DEPLOYMENT_ENVIRONMENT to something else (e.g. `production`) — at which point
+// the guard below requires a real secret. Keyed on DEPLOYMENT_ENVIRONMENT rather
+// than NODE_ENV because the local Docker stack legitimately runs NODE_ENV=production.
+const TRUSTED_ENVIRONMENTS = new Set(['local', 'ci', 'test', 'development']);
+
+/**
+ * Fail fast on an unsafe public configuration. Called at boot. Refuses to start
+ * an internet-exposed process that still uses a known demo JWT secret — the
+ * single most dangerous misconfiguration when exposing this lab publicly.
+ */
+export function assertProductionSafety(): void {
+  if (TRUSTED_ENVIRONMENTS.has(config.deploymentEnvironment)) return;
+  if (INSECURE_JWT_SECRETS.has(config.auth.jwtSecret)) {
+    throw new Error(
+      `Refusing to start: DEPLOYMENT_ENVIRONMENT=${config.deploymentEnvironment} ` +
+        'with a known demo JWT_SECRET. Set a strong, unique JWT_SECRET environment variable.',
+    );
+  }
+}

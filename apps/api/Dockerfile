@@ -1,12 +1,15 @@
+# Build context is the repository ROOT (see docker-compose.yml / render.yaml),
+# so the image can include both the API source and the database init SQL.
+#
 # ---- build stage ----
 FROM node:24-alpine AS build
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+COPY apps/api/package.json apps/api/package-lock.json* ./
 RUN npm install --no-audit --no-fund
 
-COPY tsconfig.json ./
-COPY src ./src
+COPY apps/api/tsconfig.json ./
+COPY apps/api/src ./src
 RUN npm run build
 
 # Prune dev dependencies for the runtime image.
@@ -22,7 +25,10 @@ USER node
 
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist ./dist
-COPY --chown=node:node package.json ./
+COPY --chown=node:node apps/api/package.json ./
+# Schema + seed SQL, read by the boot-time migration when RUN_DB_MIGRATIONS=true
+# (managed-Postgres hosts that do not run docker-entrypoint-initdb.d).
+COPY --chown=node:node infra/postgres/init ./db
 
 EXPOSE 3000
 

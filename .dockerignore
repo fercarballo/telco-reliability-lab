@@ -1,0 +1,17 @@
+# Build context is the repo root for the API image. Keep the context small and
+# avoid copying host node_modules / build output / local artefacts into the build.
+**/node_modules
+**/dist
+apps/api/tests
+tests
+test-results
+docs/screenshots
+**/*.log
+**/.env
+.git
+.github
+.gitlab-ci.yml
+observability
+pipelines
+scripts
+playwright.config.ts
