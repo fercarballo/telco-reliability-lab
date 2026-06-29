@@ -64,14 +64,14 @@ jobs:
       - name: Install Playwright
         run: npm install --no-audit --no-fund
 
-      # Build the API image with layer caching in GHA. On cache hit, the multi-stage
-      # build completes in seconds instead of minutes. `load: true` puts the image
-      # into the local Docker daemon so `docker compose up` can use it without --build.
+      # Build context is the repo root so the Dockerfile can reach both
+      # apps/api/src and infra/postgres/init (see apps/api/Dockerfile).
       - uses: docker/setup-buildx-action@v3
       - name: Build API image (cached)
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/api
+          context: .
+          file: apps/api/Dockerfile
           load: true
           tags: telco-reliability-lab-api:latest
           cache-from: type=gha,scope=api-image
@@ -115,7 +115,8 @@ jobs:
       - name: Build API image (cached)
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/api
+          context: .
+          file: apps/api/Dockerfile
           load: true
           tags: telco-reliability-lab-api:latest
           cache-from: type=gha,scope=api-image
