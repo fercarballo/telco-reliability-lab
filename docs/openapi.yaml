@@ -16,9 +16,10 @@ info:
     the original result without creating a second charge.
   contact:
     name: Fernando Carballo
-    email: fercarballodev@gmail.com
+    url: https://github.com/fercarballo
   license:
     name: MIT
+    url: https://opensource.org/licenses/MIT
 
 servers:
   - url: http://localhost:3000
