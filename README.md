@@ -9,6 +9,9 @@ por criterios de fiabilidad.
 > El entregable no es la carga — son las **decisiones**: SLOs defendibles, la prueba
 > correcta para cada riesgo y la observabilidad suficiente para depurar bajo presión.
 
+**Demo en vivo:** [telco-web.onrender.com](https://telco-web.onrender.com) · API: [telco-api.onrender.com/health](https://telco-api.onrender.com/health)
+_(free tier — el primer request tras inactividad puede tardar ~30 s)_
+
 ---
 
 ## Qué incluye
